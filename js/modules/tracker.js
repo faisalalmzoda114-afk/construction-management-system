@@ -739,11 +739,21 @@ const ModTracker = {
   },
 
   editForm(r, onDone) {
+    const zones = Store.getMasterData('zones');
+    const consultants = Store.getMasterData('consultants');
     const m = UI.modal(`
       <div class="drawer-h"><h2>✏️ ${TX('تعديل بيانات الملف', 'Edit case file')} — ${esc(r.ref)}</h2><button class="x-btn" data-close>✕</button></div>
       <div class="drawer-b"><div class="form-grid">
         <div class="full"><label class="fl">${TX('العنوان', 'Title')} <span class="req">*</span></label><input class="input" id="ed-title" value="${esc(r.title)}" required></div>
         <div class="full"><label class="fl">${TX('الوصف', 'Description')}</label><textarea class="input" id="ed-desc" style="height:80px">${esc(r.description || '')}</textarea></div>
+        <div><label class="fl">${TX('المنطقة / القطاع', 'Zone / Area')}</label><select class="input" id="ed-zone">
+          <option value="">${TX('— اختر —', '— Select —')}</option>
+          ${zones.map(z => `<option value="${esc(z)}" ${r.zone === z ? 'selected' : ''}>${esc(z)}</option>`).join('')}
+          <option value="__add">+ ${TX('إضافة منطقة جديدة', 'Add new zone')}</option></select></div>
+        <div><label class="fl">${TX('الاستشاري', 'Consultant')}</label><select class="input" id="ed-cons">
+          <option value="">${TX('— اختر —', '— Select —')}</option>
+          ${consultants.map(c => `<option value="${esc(c)}" ${r.consultant === c ? 'selected' : ''}>${esc(c)}</option>`).join('')}
+          <option value="__add">+ ${TX('إضافة استشاري جديد', 'Add new consultant')}</option></select></div>
         <div><label class="fl">${TX('الأولوية', 'Priority')}</label><select class="input" id="ed-pri" value="${r.priority || 'medium'}">
           <option value="low">${TX('منخفضة', 'Low')}</option>
           <option value="medium" selected>${TX('متوسطة', 'Medium')}</option>
@@ -760,6 +770,34 @@ const ModTracker = {
       </div></div>
       <div class="drawer-f"><button class="btn primary" id="ed-save">💾 ${t('save')}</button><button class="btn" data-close>${t('cancel')}</button></div>`, { wide: true });
 
+    // Handle adding new zone/consultant
+    const zoneEl = m.el.querySelector('#ed-zone');
+    const consEl = m.el.querySelector('#ed-cons');
+    if (zoneEl) zoneEl.onchange = () => {
+      if (zoneEl.value === '__add') {
+        const newZone = prompt(TX('أدخل اسم المنطقة الجديدة', 'Enter new zone name'));
+        if (newZone) {
+          Store.addMasterDataItem('zones', newZone);
+          zoneEl.innerHTML += `<option value="${esc(newZone)}" selected>${esc(newZone)}</option>`;
+          zoneEl.value = newZone;
+        } else {
+          zoneEl.value = r.zone || '';
+        }
+      }
+    };
+    if (consEl) consEl.onchange = () => {
+      if (consEl.value === '__add') {
+        const newCons = prompt(TX('أدخل اسم الاستشاري الجديد', 'Enter new consultant name'));
+        if (newCons) {
+          Store.addMasterDataItem('consultants', newCons);
+          consEl.innerHTML += `<option value="${esc(newCons)}" selected>${esc(newCons)}</option>`;
+          consEl.value = newCons;
+        } else {
+          consEl.value = r.consultant || '';
+        }
+      }
+    };
+
     m.el.querySelector('#ed-save').onclick = () => {
       const title = m.el.querySelector('#ed-title').value.trim();
       if (!title) { UI.toast(t('required'), 'err'); return; }
@@ -768,6 +806,10 @@ const ModTracker = {
       if (title !== r.title) { changes.push({ field: 'title', old: r.title, new: title }); r.title = title; }
       const desc = m.el.querySelector('#ed-desc').value.trim();
       if (desc !== r.description) { changes.push({ field: 'description', old: r.description || '', new: desc }); r.description = desc; }
+      const zone = m.el.querySelector('#ed-zone').value;
+      if (zone !== (r.zone || '')) { changes.push({ field: 'zone', old: r.zone || '', new: zone }); r.zone = zone; }
+      const cons = m.el.querySelector('#ed-cons').value;
+      if (cons !== (r.consultant || '')) { changes.push({ field: 'consultant', old: r.consultant || '', new: cons }); r.consultant = cons; }
       const pri = m.el.querySelector('#ed-pri').value;
       if (pri !== r.priority) { changes.push({ field: 'priority', old: r.priority, new: pri }); r.priority = pri; }
       const sev = m.el.querySelector('#ed-sev').value;

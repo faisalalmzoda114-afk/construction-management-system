@@ -666,6 +666,16 @@ function seedDB() {
     modules: defaultModules(), schemas: defaultSchemas(),
     workflows, dashboards, entities: E,
     counters,
+    masterData: {
+      zones: ['المنطقة A', 'المنطقة B', 'المنطقة C', 'المنطقة D', 'المنطقة E', 'المنطقة F', 'القطاع الشمالي', 'القطاع الغربي', 'القطاع الجنوبي', 'المدخل الجنوبي'],
+      categories: ['utility', 'contractorDelay', 'developerDep', 'siteProblem', 'authority', 'design', 'landAccess', 'logistics', 'commercial', 'other'],
+      consultants: ['التحالف الهندسي', 'شركة الاستشارات العامة', 'مكتب التصميم المتخصص', 'مجموعة الاستشارات المتكاملة'],
+      developers: [],
+      statuses: Store.db && Store.db.schemas ? Store.db.schemas.constraint.statuses.map(s => ({ key: s.key, label: s.label })) : [],
+      priorities: ['low', 'medium', 'high', 'critical'],
+      severities: ['low', 'medium', 'high', 'critical'],
+      owners: users.slice(1).map(u => ({ id: u.id, name: u.name, nameEn: u.nameEn })),
+    },
   };
   seedConstraintsFor(db);
   return db;
@@ -966,5 +976,35 @@ const Store = {
     let score = 100 + Math.min(schedVar * 1.6, 8);
     score -= openCrit * 5 + critIss * 5 + Math.min(overdue * 1.8, 22) + openObs * 2.5;
     return Math.max(8, Math.min(99, Math.round(score)));
+  },
+
+  // master data management
+  addMasterDataItem(category, item) {
+    if (!this.db.masterData[category]) return false;
+    if (typeof this.db.masterData[category][0] === 'string') {
+      if (!this.db.masterData[category].includes(item)) {
+        this.db.masterData[category].push(item); this.save(); return true;
+      }
+    } else {
+      if (!this.db.masterData[category].find(x => (x.id || x.key) === (item.id || item.key))) {
+        this.db.masterData[category].push(item); this.save(); return true;
+      }
+    }
+    return false;
+  },
+  removeMasterDataItem(category, itemKeyOrId) {
+    if (!this.db.masterData[category]) return false;
+    const before = this.db.masterData[category].length;
+    if (typeof this.db.masterData[category][0] === 'string') {
+      this.db.masterData[category] = this.db.masterData[category].filter(x => x !== itemKeyOrId);
+    } else {
+      this.db.masterData[category] = this.db.masterData[category].filter(x => (x.id || x.key) !== itemKeyOrId);
+    }
+    const changed = this.db.masterData[category].length !== before;
+    if (changed) this.save();
+    return changed;
+  },
+  getMasterData(category) {
+    return this.db.masterData[category] || [];
   },
 };

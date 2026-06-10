@@ -786,12 +786,12 @@ const ModTracker = {
       <button class="btn primary sm" id="ev-add" style="margin-bottom:12px">＋ ${TX('رفع مرفق / دليل', 'Upload attachment / evidence')}</button>
       <table class="tbl"><thead><tr>
         <th></th><th>${TX('الملف', 'File')}</th><th>${TX('النوع', 'Type')}</th><th>${TX('مرحلة الدليل', 'Evidence stage')}</th>
-        <th>${TX('الوصف', 'Description')}</th><th>${TX('الحالة عند الرفع', 'Status at upload')}</th><th>${TX('رُفع بواسطة', 'Uploaded by')}</th><th>${TX('التاريخ', 'Date')}</th>
+        <th>${TX('الوصف', 'Description')}</th><th>${TX('الحالة عند الرفع', 'Status at upload')}</th><th>${TX('رُفع بواسطة', 'Uploaded by')}</th><th>${TX('التاريخ', 'Date')}</th><th></th>
       </tr></thead><tbody>
       ${items.map(e => {
         const stg = TRK.evStages.find(x => x.key === e.stage) || { icon: '📎', label: () => e.stage };
         return `<tr>
-          <td>${e.dataUrl ? `<img src="${e.dataUrl}" class="ev-thumb" data-ev="${e.id}">` : `<span style="font-size:18px">${this.evIcon(e)}</span>`}</td>
+          <td>${e.dataUrl ? `<img src="${e.dataUrl}" class="ev-thumb clickable" data-ev="${e.id}" style="cursor:pointer" title="${TX('انقر للعرض', 'Click to view')}">` : `<span style="font-size:18px;cursor:pointer" class="clickable" data-ev="${e.id}">${this.evIcon(e)}</span>`}</td>
           <td class="fs12 b">${esc(e.name)}</td>
           <td class="fs12">${(TRK.evTypes.find(x => x.key === e.etype) || { label: () => e.etype }).label()}</td>
           <td><span class="chip" style="--cc:${e.stage === 'closure' ? '#34d399' : e.stage === 'rejection' ? '#f43f5e' : '#60a5fa'}">${stg.icon} ${stg.label()}</span></td>
@@ -799,28 +799,50 @@ const ModTracker = {
           <td>${e.linkedStatus ? UI.statusChip('constraint', e.linkedStatus) : '—'}</td>
           <td class="fs12">${Store.userName(e.by)}</td>
           <td class="fs11 mut">${UI.fmtDate(e.at)}</td>
+          <td><button class="btn xs" id="ev-dl-${e.id}" ${e.fullDataUrl ? '' : 'disabled'} title="${TX('تحميل', 'Download')}">⬇️</button></td>
         </tr>`;
       }).join('')}</tbody></table>
       ${!items.length ? UI.empty('📎', TX('لا مرفقات بعد', 'No attachments yet')) : ''}`;
     body.querySelector('#ev-add').onclick = () => this.evForm(r, () => refresh('attachments'));
     body.querySelectorAll('[data-ev]').forEach(img => img.onclick = () => this.lightbox(r, img.dataset.ev));
+    items.forEach(e => {
+      const btn = body.querySelector(`#ev-dl-${e.id}`);
+      if (btn && e.fullDataUrl) {
+        btn.onclick = () => {
+          const a = document.createElement('a');
+          a.href = e.fullDataUrl;
+          a.download = e.name;
+          a.click();
+        };
+      }
+    });
   },
 
   evForm(r, onDone, presetStage) {
+    const draftKey = `ev-draft-${r.id}`;
+    const draft = JSON.parse(localStorage.getItem(draftKey) || '{}');
     const m = UI.modal(`
       <div class="drawer-h"><h2>📎 ${TX('رفع مرفق / دليل', 'Upload attachment / evidence')} — ${esc(r.ref)}</h2><button class="x-btn" data-close>✕</button></div>
       <div class="drawer-b"><div class="form-grid">
         <div class="full"><label class="fl">${TX('الملفات (صور، فيديو، PDF…)', 'Files (photos, video, PDF…)')}</label>
           <input type="file" class="input" id="ev-files" multiple accept="image/*,video/*,.pdf,.doc,.docx,.xls,.xlsx,.dwg">
           <div class="fs11 mut mt8">${TX('أو أدخل أسماء الملفات يدوياً، افصل بفاصلة', 'or type file names manually, comma separated')}</div>
-          <input class="input mt8" id="ev-names" placeholder="IMG_001.jpg, letter.pdf" style="margin-top:6px"></div>
+          <input class="input mt8" id="ev-names" placeholder="IMG_001.jpg, letter.pdf" value="${esc(draft.names || '')}" style="margin-top:6px"></div>
         <div><label class="fl">${TX('نوع المرفق', 'Attachment type')}</label><select class="input" id="ev-type">
-          ${TRK.evTypes.map(x => `<option value="${x.key}">${x.icon} ${x.label()}</option>`).join('')}</select></div>
+          ${TRK.evTypes.map(x => `<option value="${x.key}" ${draft.type === x.key ? 'selected' : ''}>${x.icon} ${x.label()}</option>`).join('')}</select></div>
         <div><label class="fl">${TX('مرحلة الدليل', 'Evidence stage')}</label><select class="input" id="ev-stage">
-          ${TRK.evStages.map(x => `<option value="${x.key}" ${presetStage === x.key ? 'selected' : ''}>${x.icon} ${x.label()}</option>`).join('')}</select></div>
-        <div class="full"><label class="fl">${TX('الوصف', 'Description')}</label><input class="input" id="ev-desc"></div>
+          ${TRK.evStages.map(x => `<option value="${x.key}" ${(draft.stage || presetStage) === x.key ? 'selected' : ''}>${x.icon} ${x.label()}</option>`).join('')}</select></div>
+        <div class="full"><label class="fl">${TX('الوصف', 'Description')}</label><input class="input" id="ev-desc" value="${esc(draft.desc || '')}"></div>
       </div></div>
-      <div class="drawer-f"><button class="btn primary" id="ev-save">💾 ${t('save')}</button><button class="btn" data-close>${t('cancel')}</button></div>`, { wide: true });
+      <div class="drawer-f"><button class="btn primary" id="ev-save">💾 ${t('save')}</button><button class="btn" data-close>${t('cancel')}</button></div>`, { wide: true, onClose: () => {
+        const names = m.el.querySelector('#ev-names').value.trim();
+        const type = m.el.querySelector('#ev-type').value;
+        const stage = m.el.querySelector('#ev-stage').value;
+        const desc = m.el.querySelector('#ev-desc').value.trim();
+        if (names || desc) {
+          localStorage.setItem(draftKey, JSON.stringify({ names, type, stage, desc }));
+        }
+      }});
     m.el.querySelector('#ev-save').onclick = () => {
       const fileInput = m.el.querySelector('#ev-files');
       const names = m.el.querySelector('#ev-names').value.split(',').map(s => s.trim()).filter(Boolean);
@@ -831,10 +853,11 @@ const ModTracker = {
         if (!entries.length) { UI.toast(t('required'), 'err'); return; }
         r.evidence = r.evidence || [];
         entries.forEach(en => r.evidence.push(Object.assign({
-          id: uid('ev'), etype, stage, desc, at: todayISO(), by: Store.db.currentUserId, linkedStatus: r.status, dataUrl: null,
+          id: uid('ev'), etype, stage, desc, at: todayISO(), by: Store.db.currentUserId, linkedStatus: r.status, dataUrl: null, fullDataUrl: null,
         }, en)));
         Store.logTL('constraint', r.id, etype === 'photo' || etype === 'video' ? 'photo' : 'attachment',
           { comment: desc, attachments: entries.map(e => e.name) });
+        localStorage.removeItem(draftKey);
         m.close(); UI.toast(t('saved')); if (onDone) onDone();
       };
       const files = Array.from(fileInput.files || []);
@@ -850,15 +873,15 @@ const ModTracker = {
                 const sc = Math.min(1, 420 / Math.max(img.width, img.height));
                 cv.width = Math.round(img.width * sc); cv.height = Math.round(img.height * sc);
                 cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height);
-                entries.push({ name: fl.name, dataUrl: cv.toDataURL('image/jpeg', 0.72) });
+                entries.push({ name: fl.name, dataUrl: cv.toDataURL('image/jpeg', 0.72), fullDataUrl: rd.result, size: fl.size });
                 if (!--pending) finish(entries.concat(names.map(nm => ({ name: nm }))));
               };
-              img.onerror = () => { entries.push({ name: fl.name }); if (!--pending) finish(entries.concat(names.map(nm => ({ name: nm })))); };
+              img.onerror = () => { entries.push({ name: fl.name, fullDataUrl: rd.result, size: fl.size }); if (!--pending) finish(entries.concat(names.map(nm => ({ name: nm })))); };
               img.src = rd.result;
             };
             rd.readAsDataURL(fl);
           } else {
-            entries.push({ name: fl.name });
+            entries.push({ name: fl.name, size: fl.size });
             if (!--pending) finish(entries.concat(names.map(nm => ({ name: nm }))));
           }
         });
@@ -895,21 +918,85 @@ const ModTracker = {
   },
 
   lightbox(r, evId) {
-    const e = (r.evidence || []).find(x => x.id === evId);
-    if (!e) return;
-    const stg = TRK.evStages.find(x => x.key === e.stage) || { icon: '📎', label: () => e.stage };
-    UI.modal(`
-      <div class="drawer-h"><h2>${this.evIcon(e)} ${esc(e.name)}</h2><button class="x-btn" data-close>✕</button></div>
-      <div class="drawer-b center">
-        ${e.dataUrl ? `<img src="${e.dataUrl}" style="max-width:100%;max-height:60vh;border-radius:12px">`
-          : `<div style="font-size:80px;padding:40px">${this.evIcon(e)}</div>`}
-        <div class="mt14 flexw" style="justify-content:center">
-          <span class="chip" style="--cc:#60a5fa">${stg.icon} ${stg.label()}</span>
-          ${e.linkedStatus ? UI.statusChip('constraint', e.linkedStatus) : ''}
-        </div>
-        <div class="fs12 mt8">${esc(e.desc || '')}</div>
-        <div class="fs11 mut mt8">${UI.fmtDate(e.at)} · ${Store.userName(e.by)}</div>
-      </div>`, { wide: true });
+    const idx = (r.evidence || []).findIndex(x => x.id === evId);
+    if (idx < 0) return;
+    const ev = r.evidence || [];
+    let currentIdx = idx;
+    const show = () => {
+      const e = ev[currentIdx];
+      if (!e) return;
+      const stg = TRK.evStages.find(x => x.key === e.stage) || { icon: '📎', label: () => e.stage };
+      const fileSize = e.size ? `${(e.size / 1024 / 1024).toFixed(1)} MB` : '—';
+      const isImage = /\.(jpe?g|png|gif|webp)$/i.test(e.name);
+      const isPdf = /\.pdf$/i.test(e.name);
+      m.el.querySelector('.drawer-b').innerHTML = `
+        <div class="center" style="padding:20px">
+          <div style="position:relative;margin-bottom:20px">
+            ${e.dataUrl ? (isImage ? `<img src="${e.dataUrl}" id="lb-img" style="max-width:100%;max-height:55vh;border-radius:12px;cursor:zoom-in" title="${TX('انقر للتكبير', 'Click to zoom')}">` :
+              isPdf ? `<div style="font-size:60px;padding:40px;background:rgba(100,100,100,.1);border-radius:12px">📄</div>` :
+              `<div style="font-size:60px;padding:40px;background:rgba(100,100,100,.1);border-radius:12px">${this.evIcon(e)}</div>`)
+              : `<div style="font-size:60px;padding:40px;background:rgba(100,100,100,.1);border-radius:12px">${this.evIcon(e)}</div>`}
+            <div style="position:absolute;top:10px;right:10px;display:flex;gap:8px">
+              ${e.fullDataUrl ? `<button class="btn xs" id="lb-download" title="${TX('تحميل', 'Download')}">⬇️</button>` : ''}
+              ${e.dataUrl ? `<button class="btn xs" id="lb-fullscreen" title="${TX('ملء الشاشة', 'Fullscreen')}">⛶</button>` : ''}
+            </div>
+            ${ev.length > 1 ? `<div style="position:absolute;top:50%;left:10px;right:10px;display:flex;justify-content:space-between">
+              <button class="btn xs" id="lb-prev" style="opacity:${currentIdx > 0 ? 1 : 0.3}" ${currentIdx > 0 ? '' : 'disabled'}>◀ ${TX('السابق', 'Prev')}</button>
+              <button class="btn xs" id="lb-next" style="opacity:${currentIdx < ev.length - 1 ? 1 : 0.3}" ${currentIdx < ev.length - 1 ? '' : 'disabled'}>▶ ${TX('التالي', 'Next')}</button>
+            </div>` : ''}
+            <div style="position:absolute;top:10px;left:10px;background:rgba(0,0,0,.6);color:white;padding:4px 8px;border-radius:6px;font-size:12px">${currentIdx + 1}/${ev.length}</div>
+          </div>
+          <div class="mt14 flexw" style="justify-content:center;flex-wrap:wrap;gap:8px">
+            <span class="chip" style="--cc:#60a5fa">${stg.icon} ${stg.label()}</span>
+            ${e.linkedStatus ? UI.statusChip('constraint', e.linkedStatus) : ''}
+          </div>
+          <div class="fs12 mt8 b">${esc(e.name)}</div>
+          <div class="fs12 mt4">${esc(e.desc || '')}</div>
+          <div class="fs11 mut mt8">${UI.fmtDate(e.at)} · ${Store.userName(e.by)} · ${fileSize}</div>
+        </div>`;
+      const btnPrev = m.el.querySelector('#lb-prev');
+      const btnNext = m.el.querySelector('#lb-next');
+      const btnDl = m.el.querySelector('#lb-download');
+      const btnFs = m.el.querySelector('#lb-fullscreen');
+      const imgEl = m.el.querySelector('#lb-img');
+      if (btnPrev) btnPrev.onclick = () => { currentIdx = Math.max(0, currentIdx - 1); show(); };
+      if (btnNext) btnNext.onclick = () => { currentIdx = Math.min(ev.length - 1, currentIdx + 1); show(); };
+      if (btnDl) btnDl.onclick = () => {
+        const a = document.createElement('a');
+        a.href = ev[currentIdx].fullDataUrl;
+        a.download = ev[currentIdx].name;
+        a.click();
+      };
+      if (btnFs && imgEl) {
+        btnFs.onclick = () => {
+          if (imgEl.requestFullscreen) {
+            imgEl.requestFullscreen().catch(() => {});
+          } else if (imgEl.webkitRequestFullscreen) {
+            imgEl.webkitRequestFullscreen();
+          }
+        };
+      }
+      if (imgEl) imgEl.onclick = () => {
+        const zoom = m.el.querySelector('#lb-zoom');
+        if (zoom) {
+          zoom.remove();
+        } else {
+          const z = document.createElement('div');
+          z.id = 'lb-zoom';
+          z.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.8);display:flex;align-items:center;justify-content:center;z-index:9999;cursor:zoom-out';
+          const img = document.createElement('img');
+          img.src = imgEl.src;
+          img.style.cssText = 'max-width:90vw;max-height:90vh;border-radius:12px';
+          z.appendChild(img);
+          z.onclick = () => z.remove();
+          document.body.appendChild(z);
+        }
+      };
+    };
+    const m = UI.modal(`
+      <div class="drawer-h"><h2>${this.evIcon(ev[idx])} ${esc(ev[idx].name)}</h2><button class="x-btn" data-close>✕</button></div>
+      <div class="drawer-b"></div>`, { wide: true });
+    show();
   },
 
   /* ---------- related items ---------- */

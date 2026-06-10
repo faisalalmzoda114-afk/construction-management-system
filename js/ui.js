@@ -220,4 +220,63 @@ const UI = {
   empty(icon, msg) {
     return `<div class="empty"><div class="e-ico">${icon}</div><div>${esc(msg || t('noData'))}</div></div>`;
   },
+
+  /* ---------- searchable combo box ---------- */
+  searchCombo(id, options, onSelect, { placeholder = '', multi = false, freeText = true, displayFn = null } = {}) {
+    const idNum = Math.random().toString(36).slice(2, 9);
+    const htmlId = `combo_${id}_${idNum}`;
+
+    return `<div class="search-combo" id="${htmlId}">
+      <input type="text" class="input combo-input" placeholder="${placeholder}" data-combo-search data-combo-id="${htmlId}">
+      <div class="combo-results hidden" style="display:none;position:absolute;top:100%;left:0;right:0;background:var(--bg-2);border:1px solid var(--border);border-radius:6px;max-height:200px;overflow-y:auto;z-index:100">
+        ${options.map(opt => `<div class="combo-result" data-value="${esc(opt.id || opt.key || opt)}" title="${esc(displayFn ? displayFn(opt) : (opt.name || opt))}" style="padding:8px 12px;cursor:pointer;border-bottom:1px solid var(--border);hover:background-color:var(--accent,.1)">${esc(displayFn ? displayFn(opt) : (opt.name || opt))}</div>`).join('')}
+        ${freeText ? `<div class="combo-add" style="padding:8px 12px;cursor:pointer;color:var(--accent);font-weight:500;border-top:1px solid var(--border)">+ ${t('add')}</div>` : ''}
+      </div>
+      <div class="combo-selected flex" style="flex-wrap:wrap;gap:6px;margin-top:8px"></div>
+    </div>`;
+  },
+
+  initSearchCombo(container, id, options, onSelect, config = {}) {
+    const comboEl = container.querySelector(`[id^="combo_${id}_"]`);
+    if (!comboEl) return;
+
+    const input = comboEl.querySelector('.combo-input');
+    const results = comboEl.querySelector('.combo-results');
+    const selected = comboEl.querySelector('.combo-selected');
+    const resultItems = comboEl.querySelectorAll('.combo-result');
+    const addBtn = comboEl.querySelector('.combo-add');
+    let allOptions = [...options];
+
+    input.addEventListener('input', (e) => {
+      const q = e.target.value.toLowerCase();
+      let visible = 0;
+      resultItems.forEach(item => {
+        const match = !q || item.textContent.toLowerCase().includes(q);
+        item.style.display = match ? 'block' : 'none';
+        if (match) visible++;
+      });
+      results.style.display = visible > 0 || config.freeText ? 'block' : 'none';
+    });
+
+    resultItems.forEach(item => {
+      item.addEventListener('click', () => {
+        const val = item.getAttribute('data-value');
+        const text = item.textContent;
+        onSelect(val, text);
+        input.value = '';
+        results.style.display = 'none';
+      });
+    });
+
+    if (addBtn) {
+      addBtn.addEventListener('click', () => {
+        const val = input.value.trim();
+        if (val) {
+          onSelect(val, val);
+          input.value = '';
+          results.style.display = 'none';
+        }
+      });
+    }
+  },
 };

@@ -741,19 +741,46 @@ const ModTracker = {
   editForm(r, onDone) {
     const zones = Store.getMasterData('zones');
     const consultants = Store.getMasterData('consultants');
+    const users = Store.db.users;
+    const contractors = Store.db.contractors;
+
     const m = UI.modal(`
       <div class="drawer-h"><h2>✏️ ${TX('تعديل بيانات الملف', 'Edit case file')} — ${esc(r.ref)}</h2><button class="x-btn" data-close>✕</button></div>
       <div class="drawer-b"><div class="form-grid">
         <div class="full"><label class="fl">${TX('العنوان', 'Title')} <span class="req">*</span></label><input class="input" id="ed-title" value="${esc(r.title)}" required></div>
         <div class="full"><label class="fl">${TX('الوصف', 'Description')}</label><textarea class="input" id="ed-desc" style="height:80px">${esc(r.description || '')}</textarea></div>
+
+        <div><label class="fl">${TX('المالك الحالي', 'Current Owner')}</label><select class="input" id="ed-owner">
+          <option value="">${TX('— اختر —', '— Select —')}</option>
+          ${users.filter(u => u.id !== Store.db.currentUserId).map(u => `<option value="${u.id}" ${r.currentOwner === u.id ? 'selected' : ''}>${esc(u.name)}</option>`).join('')}</select></div>
+
+        <div><label class="fl">${TX('مسند إلى', 'Assigned To')}</label><select class="input" id="ed-assigned">
+          <option value="">${TX('— اختر —', '— Select —')}</option>
+          ${users.map(u => `<option value="${u.id}" ${r.assignedTo === u.id ? 'selected' : ''}>${esc(u.name)}</option>`).join('')}</select></div>
+
+        <div><label class="fl">${TX('الجهة المسؤولة', 'Responsible Party')}</label><select class="input" id="ed-respparty">
+          <option value="">— ${TX('اختر', 'Select')} —</option>
+          <option value="contractor" ${r.responsibleParty === 'contractor' ? 'selected' : ''}>${TX('المقاول', 'Contractor')}</option>
+          <option value="consultant" ${r.responsibleParty === 'consultant' ? 'selected' : ''}>${TX('الاستشاري', 'Consultant')}</option>
+          <option value="developer" ${r.responsibleParty === 'developer' ? 'selected' : ''}>${TX('المطور', 'Developer')}</option>
+          <option value="client" ${r.responsibleParty === 'client' ? 'selected' : ''}>${TX('العميل', 'Client')}</option>
+          <option value="authority" ${r.responsibleParty === 'authority' ? 'selected' : ''}>${TX('الجهة الحكومية', 'Authority')}</option>
+          <option value="internal" ${r.responsibleParty === 'internal' ? 'selected' : ''}>${TX('فريق المشروع', 'Internal Team')}</option></select></div>
+
+        <div><label class="fl">${TX('المقاول', 'Contractor')}</label><select class="input" id="ed-contractor">
+          <option value="">${TX('— اختر —', '— Select —')}</option>
+          ${contractors.map(c => `<option value="${c.id}" ${r.contractor === c.id ? 'selected' : ''}>${esc(c.name)}</option>`).join('')}</select></div>
+
         <div><label class="fl">${TX('المنطقة / القطاع', 'Zone / Area')}</label><select class="input" id="ed-zone">
           <option value="">${TX('— اختر —', '— Select —')}</option>
           ${zones.map(z => `<option value="${esc(z)}" ${r.zone === z ? 'selected' : ''}>${esc(z)}</option>`).join('')}
           <option value="__add">+ ${TX('إضافة منطقة جديدة', 'Add new zone')}</option></select></div>
+
         <div><label class="fl">${TX('الاستشاري', 'Consultant')}</label><select class="input" id="ed-cons">
           <option value="">${TX('— اختر —', '— Select —')}</option>
           ${consultants.map(c => `<option value="${esc(c)}" ${r.consultant === c ? 'selected' : ''}>${esc(c)}</option>`).join('')}
           <option value="__add">+ ${TX('إضافة استشاري جديد', 'Add new consultant')}</option></select></div>
+
         <div><label class="fl">${TX('الأولوية', 'Priority')}</label><select class="input" id="ed-pri" value="${r.priority || 'medium'}">
           <option value="low">${TX('منخفضة', 'Low')}</option>
           <option value="medium" selected>${TX('متوسطة', 'Medium')}</option>
@@ -803,31 +830,45 @@ const ModTracker = {
       if (!title) { UI.toast(t('required'), 'err'); return; }
 
       const changes = [];
-      if (title !== r.title) { changes.push({ field: 'title', old: r.title, new: title }); r.title = title; }
-      const desc = m.el.querySelector('#ed-desc').value.trim();
-      if (desc !== r.description) { changes.push({ field: 'description', old: r.description || '', new: desc }); r.description = desc; }
-      const zone = m.el.querySelector('#ed-zone').value;
-      if (zone !== (r.zone || '')) { changes.push({ field: 'zone', old: r.zone || '', new: zone }); r.zone = zone; }
-      const cons = m.el.querySelector('#ed-cons').value;
-      if (cons !== (r.consultant || '')) { changes.push({ field: 'consultant', old: r.consultant || '', new: cons }); r.consultant = cons; }
-      const pri = m.el.querySelector('#ed-pri').value;
-      if (pri !== r.priority) { changes.push({ field: 'priority', old: r.priority, new: pri }); r.priority = pri; }
-      const sev = m.el.querySelector('#ed-sev').value;
-      if (sev !== r.severity) { changes.push({ field: 'severity', old: r.severity, new: sev }); r.severity = sev; }
-      const due = m.el.querySelector('#ed-due').value;
-      if (due !== (r.dueDate || '')) { changes.push({ field: 'dueDate', old: r.dueDate, new: due }); r.dueDate = due; }
-      const tc = m.el.querySelector('#ed-tc').value;
-      if (tc !== (r.targetClosure || '')) { changes.push({ field: 'targetClosure', old: r.targetClosure, new: tc }); r.targetClosure = tc; }
-      const notes = m.el.querySelector('#ed-notes').value.trim();
-      if (notes !== (r.notes || '')) { changes.push({ field: 'notes', old: r.notes || '', new: notes }); r.notes = notes; }
-      const tags = m.el.querySelector('#ed-tags').value.split(',').map(t => t.trim()).filter(t => t);
-      if (JSON.stringify(tags) !== JSON.stringify(r.tags || [])) { changes.push({ field: 'tags', old: (r.tags || []).join(', '), new: tags.join(', ') }); r.tags = tags; }
+      const fields = {
+        title: m.el.querySelector('#ed-title').value.trim(),
+        description: m.el.querySelector('#ed-desc').value.trim(),
+        currentOwner: m.el.querySelector('#ed-owner').value,
+        assignedTo: m.el.querySelector('#ed-assigned').value,
+        responsibleParty: m.el.querySelector('#ed-respparty').value,
+        contractor: m.el.querySelector('#ed-contractor').value,
+        zone: m.el.querySelector('#ed-zone').value,
+        consultant: m.el.querySelector('#ed-cons').value,
+        priority: m.el.querySelector('#ed-pri').value,
+        severity: m.el.querySelector('#ed-sev').value,
+        dueDate: m.el.querySelector('#ed-due').value,
+        targetClosure: m.el.querySelector('#ed-tc').value,
+        notes: m.el.querySelector('#ed-notes').value.trim(),
+        tags: m.el.querySelector('#ed-tags').value.split(',').map(t => t.trim()).filter(t => t),
+      };
+
+      Object.keys(fields).forEach(k => {
+        const oldVal = r[k];
+        const newVal = fields[k];
+        if (k === 'tags') {
+          if (JSON.stringify(newVal) !== JSON.stringify(oldVal || [])) {
+            changes.push({ field: k, old: (oldVal || []).join(', '), new: newVal.join(', ') });
+            r[k] = newVal;
+          }
+        } else if (newVal !== (oldVal || '')) {
+          const displayOld = k.includes('Owner') || k.includes('assigned') || k === 'contractor' ? Store.userName(oldVal) || oldVal : oldVal;
+          const displayNew = k.includes('Owner') || k.includes('assigned') || k === 'contractor' ? Store.userName(newVal) || newVal : newVal;
+          changes.push({ field: k, old: displayOld || '', new: displayNew || '' });
+          r[k] = newVal;
+        }
+      });
 
       if (changes.length === 0) { UI.toast(TX('لا تغييرات', 'No changes')); m.close(); return; }
 
       changes.forEach(c => {
         Store.logTL('constraint', r.id, 'edit', { comment: `${c.field} updated`, oldVal: c.old, newVal: c.new });
       });
+      Store.save();
       m.close(); UI.toast(t('saved')); if (onDone) onDone();
     };
   },

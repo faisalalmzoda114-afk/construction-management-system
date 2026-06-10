@@ -675,6 +675,22 @@ function seedDB() {
       priorities: ['low', 'medium', 'high', 'critical'],
       severities: ['low', 'medium', 'high', 'critical'],
       owners: users.slice(1).map(u => ({ id: u.id, name: u.name, nameEn: u.nameEn })),
+      organizations: [
+        { id: 'org_c1', type: 'contractor', name: 'شركة البناء المتحدة', nameEn: 'United Construction Co.', contactIds: ['p_c1_1'] },
+        { id: 'org_c2', type: 'contractor', name: 'مجموعة الإنشاءات الحديثة', nameEn: 'Modern Constructions Group', contactIds: ['p_c2_1'] },
+        { id: 'org_c3', type: 'contractor', name: 'شركة الأسس العالمية', nameEn: 'Global Foundations Co.', contactIds: ['p_c3_1'] },
+        { id: 'org_c4', type: 'contractor', name: 'شركة دلتا للمقاولات', nameEn: 'Delta Contracting', contactIds: ['p_c4_1'] },
+        { id: 'org_c5', type: 'consultant', name: 'التحالف الهندسي', nameEn: 'Engineering Alliance', contactIds: ['p_c5_1'] },
+        { id: 'org_c6', type: 'contractor', name: 'شركة الرواد للبنية التحتية', nameEn: 'Pioneers Infrastructure', contactIds: ['p_c6_1'] },
+      ],
+      people: [
+        { id: 'p_c1_1', name: 'أحمد فؤاد', nameEn: 'Ahmed Fouad', position: 'مدير المشروع', company: 'org_c1', email: 'a.fouad@ucc.sa', mobile: '0501234567' },
+        { id: 'p_c2_1', name: 'طارق سليم', nameEn: 'Tariq Salim', position: 'مدير العمليات', company: 'org_c2', email: 't.salim@mcg.sa', mobile: '0552223344' },
+        { id: 'p_c3_1', name: 'ياسر النعيمي', nameEn: 'Yasser Naimi', position: 'مدير الموقع', company: 'org_c3', email: 'y.naimi@gfc.sa', mobile: '0533334455' },
+        { id: 'p_c4_1', name: 'هاني عبدالرحمن', nameEn: 'Hani Abdulrahman', position: 'مدير المشروع', company: 'org_c4', email: 'h.abdulrahman@delta.sa', mobile: '0544445566' },
+        { id: 'p_c5_1', name: 'ريم الدوسري', nameEn: 'Reem Dosari', position: 'مديرة التصميم', company: 'org_c5', email: 'r.dosari@ealliance.sa', mobile: '0566667788' },
+        { id: 'p_c6_1', name: 'سعد المالكي', nameEn: 'Saad Malki', position: 'مدير المشروع', company: 'org_c6', email: 's.malki@pioneers.sa', mobile: '0577778899' },
+      ],
     },
   };
   seedConstraintsFor(db);
@@ -1006,5 +1022,35 @@ const Store = {
   },
   getMasterData(category) {
     return this.db.masterData[category] || [];
+  },
+
+  // People & Organization Directory
+  getOrganizations(type) { return this.db.masterData.organizations.filter(o => !type || o.type === type); },
+  getPeople(orgId) { return orgId ? this.db.masterData.people.filter(p => p.company === orgId) : this.db.masterData.people; },
+  getOrganization(id) { return this.db.masterData.organizations.find(o => o.id === id); },
+  getPerson(id) { return this.db.masterData.people.find(p => p.id === id); },
+  addOrganization(org) {
+    org.id = org.id || uid('org');
+    this.db.masterData.organizations.push(org);
+    this.save();
+    return org;
+  },
+  addPerson(person) {
+    person.id = person.id || uid('p');
+    this.db.masterData.people.push(person);
+    this.save();
+    return person;
+  },
+  searchOrganizations(query, type) {
+    const orgs = this.getOrganizations(type);
+    if (!query) return orgs;
+    const q = query.toLowerCase();
+    return orgs.filter(o => o.name.toLowerCase().includes(q) || (o.nameEn && o.nameEn.toLowerCase().includes(q)));
+  },
+  searchPeople(query, orgId) {
+    const people = this.getPeople(orgId);
+    if (!query) return people;
+    const q = query.toLowerCase();
+    return people.filter(p => p.name.toLowerCase().includes(q) || p.nameEn.toLowerCase().includes(q) || p.email.toLowerCase().includes(q));
   },
 };

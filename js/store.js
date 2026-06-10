@@ -20,6 +20,7 @@ function defaultModules() {
     { key: 'actions',        icon: '⚡', group: 'gExecution', labelKey: 'mActions',        builtin: true, visible: true, entity: 'action' },
     { key: 'risks',          icon: '🛡️', group: 'gExecution', labelKey: 'mRisks',          builtin: true, visible: true, entity: 'risk' },
     { key: 'issues',         icon: '🧩', group: 'gExecution', labelKey: 'mIssues',         builtin: true, visible: true, entity: 'issue' },
+    { key: 'tracker',        icon: '🚩', group: 'gExecution', labelKey: 'mTracker',        builtin: true, visible: true, entity: 'constraint' },
     { key: 'observations',   icon: '📸', group: 'gExecution', labelKey: 'mObservations',   builtin: true, visible: true, entity: 'observation' },
     { key: 'contractors',    icon: '🏗️', group: 'gExecution', labelKey: 'mContractors',    builtin: true, visible: true },
     { key: 'correspondence', icon: '✉️', group: 'gKnowledge', labelKey: 'mCorrespondence', builtin: true, visible: true, entity: 'correspondence' },
@@ -116,6 +117,68 @@ function defaultSchemas() {
         { key: 'interface', label: L('Interface', 'تداخلات') }, { key: 'material', label: L('Materials', 'مواد') },
       ],
       tags: ['متكرر', 'حرج للمسار', 'مطالبة محتملة'],
+    },
+    constraint: {
+      icon: '🚩', label: L('Issue / Constraint', 'معوق / مشكلة'), refPrefix: 'CST',
+      views: ['list', 'kanban', 'timeline'],
+      fields: [
+        { key: 'title',       type: 'text',     label: L('Title', 'العنوان'), required: true, system: true },
+        { key: 'description', type: 'textarea', label: L('Description', 'الوصف'), system: true },
+        { key: 'zone',        type: 'text',     label: L('Zone / Area', 'المنطقة / القطاع'), system: true },
+        { key: 'street',      type: 'text',     label: L('Street / Location', 'الشارع / الموقع'), system: true },
+        { key: 'gps',         type: 'gps',      label: L('GPS', 'الإحداثيات') },
+        { key: 'subcategory', type: 'text',     label: L('Subcategory', 'الفئة الفرعية') },
+        { key: 'priority',    type: 'priority', label: L('Priority', 'الأولوية'), system: true },
+        { key: 'severity',    type: 'select',   label: L('Severity', 'الخطورة'), options: ['critical', 'high', 'medium', 'low'], system: true },
+        { key: 'responsibleParty', type: 'select', label: L('Responsible Party', 'الجهة المسؤولة'),
+          options: ['contractor', 'consultant', 'developer', 'client', 'authority', 'internal'], required: true, system: true },
+        { key: 'currentOwner', type: 'user',    label: L('Current Owner', 'المالك الحالي'), required: true, system: true },
+        { key: 'assignedTo',  type: 'user',     label: L('Assigned To', 'مسند إلى') },
+        { key: 'raisedBy',    type: 'user',     label: L('Raised By', 'مُسجَّل بواسطة') },
+        { key: 'sentTo',      type: 'text',     label: L('Sent To', 'أُرسل إلى'), system: true },
+        { key: 'contractor',  type: 'contractor', label: L('Contractor', 'المقاول') },
+        { key: 'consultant',  type: 'text',     label: L('Consultant', 'الاستشاري') },
+        { key: 'developer',   type: 'text',     label: L('Developer', 'المطور') },
+        { key: 'clientParty', type: 'text',     label: L('Client', 'العميل') },
+        { key: 'extRef',      type: 'text',     label: L('Reference No.', 'الرقم المرجعي') },
+        { key: 'impactedActivity',  type: 'text', label: L('Impacted Activity', 'النشاط المتأثر') },
+        { key: 'impactedMilestone', type: 'text', label: L('Impacted Milestone', 'المعلم المتأثر') },
+        { key: 'impactedWorkfront', type: 'text', label: L('Impacted Workfront', 'جبهة العمل المتأثرة') },
+        { key: 'dueDate',       type: 'date',   label: L('Due Date', 'تاريخ الاستحقاق'), system: true },
+        { key: 'targetClosure', type: 'date',   label: L('Target Closure', 'الإغلاق المستهدف') },
+        { key: 'notes',         type: 'textarea', label: L('Notes', 'ملاحظات') },
+        { key: 'tags', type: 'tags', label: L('Tags', 'الوسوم'), system: true },
+      ],
+      statuses: [
+        ST('draft', 'Draft', 'مسودة', '#94a3b8'),
+        ST('submitted', 'Submitted', 'مُقدَّم', '#60a5fa'),
+        ST('sent', 'Sent', 'مُرسَل', '#38bdf8'),
+        ST('received', 'Received', 'مُستلَم', '#2dd4bf'),
+        ST('review', 'Under Review', 'قيد المراجعة', '#f5b942'),
+        ST('actionreq', 'Action Required', 'يتطلب إجراء', '#fb923c'),
+        ST('inprogress', 'In Progress', 'قيد المعالجة', '#22d3ee'),
+        ST('pendingresp', 'Pending Response', 'بانتظار الرد', '#c084fc'),
+        ST('blocked', 'Blocked', 'متعثر', '#f87171'),
+        ST('escalated', 'Escalated', 'مُصعَّد', '#ef4444'),
+        ST('readyclosure', 'Ready for Closure', 'جاهز للإغلاق', '#a3e635'),
+        ST('closed', 'Closed', 'مغلق', '#34d399', true),
+        ST('rejectedclosure', 'Closure Rejected', 'إغلاق مرفوض', '#f43f5e'),
+        ST('reopened', 'Reopened', 'أُعيد فتحه', '#f97316'),
+        ST('cancelled', 'Cancelled', 'ملغي', '#64748b', true),
+      ],
+      categories: [
+        { key: 'utility', label: L('Utility Conflict', 'تعارض مرافق') },
+        { key: 'contractorDelay', label: L('Contractor Delay', 'تأخير مقاول') },
+        { key: 'developerDep', label: L('Developer Dependency', 'اعتمادية على المطور') },
+        { key: 'siteProblem', label: L('Site Problem', 'مشكلة موقع') },
+        { key: 'authority', label: L('Authorities / Permits', 'جهات حكومية / تصاريح') },
+        { key: 'design', label: L('Design', 'تصميم') },
+        { key: 'landAccess', label: L('Land / Right of Way', 'أراضٍ / حرم طريق') },
+        { key: 'logistics', label: L('Logistics', 'لوجستيات') },
+        { key: 'commercial', label: L('Commercial', 'تجاري') },
+        { key: 'other', label: L('Other', 'أخرى') },
+      ],
+      tags: ['حرج للمسار', 'مطالبة محتملة', 'جهة خارجية', 'متكرر'],
     },
     observation: {
       icon: '📸', label: L('Observation', 'ملاحظة ميدانية'), refPrefix: 'OBS',
@@ -332,7 +395,7 @@ function seedDB() {
     }, data);
   };
 
-  const E = { action: [], risk: [], issue: [], observation: [], correspondence: [], meeting: [], lesson: [], document: [] };
+  const E = { action: [], risk: [], issue: [], constraint: [], observation: [], correspondence: [], meeting: [], lesson: [], document: [] };
 
   /* ---- risks ---- */
   const riskPool = [
@@ -596,7 +659,7 @@ function seedDB() {
     ] },
   ];
 
-  return {
+  const db = {
     version: 1, currentUserId: null, currentProjectId: null,
     settings: { orgName: 'الإدارة العامة للمشاريع', orgNameEn: 'Projects General Directorate' },
     users, roles, contractors, projects,
@@ -604,6 +667,141 @@ function seedDB() {
     workflows, dashboards, entities: E,
     counters,
   };
+  seedConstraintsFor(db);
+  return db;
+}
+
+/* ---------- seed: issue & constraint tracking (case files) ---------- */
+function seedConstraintsFor(db) {
+  db.entities.constraint = db.entities.constraint || [];
+  let n = db.counters.constraint || 0;
+  const iso = d => d + 'T10:30:00';
+  // [title, category, zone, street, party, priority, severity]
+  const pool = [
+    ['تعارض خط مياه قائم 600مم مع مسار شبكة الصرف الجديدة', 'utility', 'المنطقة A', 'شارع الملك عبدالعزيز', 'developer', 'critical', 'critical'],
+    ['تأخر المقاول في تعبئة فريق أعمال الواجهات حسب البرنامج', 'contractorDelay', 'المنطقة B', 'واجهة البرج الشرقية', 'contractor', 'high', 'high'],
+    ['بانتظار المطور لتسليم جبهة العمل — القطاع الشمالي', 'developerDep', 'القطاع الشمالي', 'حرم الطريق الدائري', 'developer', 'critical', 'high'],
+    ['عدم صدور تصريح الحفر من الأمانة للتقاطع 12', 'authority', 'المنطقة C', 'تقاطع طريق الأمير محمد', 'authority', 'high', 'critical'],
+    ['وجود كيبل ألياف بصرية غير مسجل يعترض مسار الحفر', 'utility', 'المنطقة A', 'شارع العليا الفرعي', 'authority', 'high', 'high'],
+    ['خلاف على منسوب الربط مع شبكة تصريف السيول القائمة', 'design', 'المنطقة D', 'قناة التصريف الرئيسية', 'consultant', 'medium', 'medium'],
+    ['تأخر اعتماد مخططات الورشة لأعمال الجسر', 'design', 'المنطقة B', 'جسر التقاطع 4', 'consultant', 'high', 'medium'],
+    ['إغلاق مؤقت لمسار النقل بسبب أعمال مشروع مجاور', 'logistics', 'المدخل الجنوبي', 'طريق الخدمة الموازي', 'developer', 'medium', 'high'],
+    ['نزاع على حدود حرم الطريق مع ملاك مجاورين', 'landAccess', 'القطاع الغربي', 'المخطط 7', 'client', 'high', 'critical'],
+    ['تعثر توريد مواد الردم المطابقة بالكميات المطلوبة', 'contractorDelay', 'المنطقة E', 'مناطق الردم 3-5', 'contractor', 'medium', 'medium'],
+    ['مطالبة المقاول بأمر تغيير قبل استكمال أعمال التحويلات', 'commercial', 'المنطقة C', 'تحويلة المرور 2', 'contractor', 'high', 'high'],
+    ['تأخر مناقلة وإزالة عدادات الكهرباء القائمة', 'utility', 'المنطقة F', 'شارع الستين', 'authority', 'medium', 'low'],
+  ];
+  const stFlow = ['sent', 'pendingresp', 'escalated', 'inprogress', 'blocked', 'closed', 'review', 'actionreq', 'reopened', 'closed', 'submitted', 'received'];
+  const partyName = { contractor: 'المقاول', consultant: 'الاستشاري', developer: 'المطور', client: 'العميل', authority: 'الجهة الحكومية', internal: 'فريق المشروع' };
+
+  db.projects.forEach((p, pi) => {
+    const cnt = pi === 0 ? 12 : 4 + (pi % 3);
+    for (let i = 0; i < cnt; i++) {
+      const it = pool[(i + pi * 2) % pool.length];
+      const status = stFlow[(i + pi) % stFlow.length];
+      const age = 12 + ((i * 17 + pi * 9) % 110);
+      const created = dOff(-age);
+      const con = db.contractors.find(c => c.id === p.contractorId) || {};
+      n++;
+      const rec = {
+        id: uid('constraint'), ref: `CST-${String(n).padStart(4, '0')}`,
+        projectId: p.id, status, archived: false,
+        title: it[0], description: 'تم رصد المعوق خلال متابعة الأعمال الميدانية وتقييم أثره على الجدول الزمني وجبهات العمل، وجارٍ تتبعه حتى الإغلاق النهائي.',
+        category: it[1], subcategory: '', zone: it[2], street: it[3],
+        gps: `${(24.55 + (i * 7 % 40) / 100).toFixed(4)}, ${(46.42 + (i * 11 % 50) / 100).toFixed(4)}`,
+        priority: it[5], severity: it[6], responsibleParty: it[4],
+        currentOwner: db.users[(i % 4) + 1].id, assignedTo: db.users[(i % 3) + 2].id, raisedBy: 'u2',
+        sentTo: partyName[it[4]], contractor: p.contractorId,
+        consultant: 'التحالف الهندسي', developer: p.client, clientParty: p.client,
+        extRef: `${p.code}/CST/${2026}/${100 + n}`,
+        impactedActivity: 'أعمال الحفر والبنية التحتية — ' + it[2],
+        impactedMilestone: (p.milestones && p.milestones[0]) ? p.milestones[0].title : '',
+        impactedWorkfront: it[2] + ' — ' + it[3],
+        dueDate: dOff(((i * 6) % 40) - 12), targetClosure: dOff(((i * 6) % 40) - 5),
+        notes: '', tags: it[5] === 'critical' ? ['حرج للمسار'] : [],
+        createdAt: created, updatedAt: dOff(-Math.max(1, Math.floor(age / 4))), createdBy: 'u2',
+        submittedAt: dOff(-age + 1), sentAt: dOff(-age + 2),
+        receivedAt: ['submitted', 'sent'].includes(status) ? '' : dOff(-age + 4),
+        escalatedAt: status === 'escalated' ? dOff(-Math.floor(age / 3)) : '',
+        closedAt: '', reopenedAt: '',
+        followups: [], responses: [], evidence: [], links: [], closures: [],
+        history: [{ at: created, by: 'u2', text: 'تم الإنشاء' }],
+        timeline: [
+          { at: iso(created), by: 'u2', action: 'created', comment: 'تم إنشاء ملف المعوق وتوثيق التفاصيل الأولية.', oldVal: '', newVal: '', attachments: [] },
+          { at: iso(dOff(-age + 1)), by: 'u2', action: 'submitted', comment: 'تم تقديم المعوق للاعتماد الداخلي.', oldVal: 'draft', newVal: 'submitted', attachments: [] },
+          { at: iso(dOff(-age + 2)), by: 'u2', action: 'sent', comment: `تم الإرسال رسمياً إلى ${partyName[it[4]]}.`, oldVal: 'submitted', newVal: 'sent', attachments: [] },
+        ],
+      };
+      // follow-ups
+      const fuN = 1 + (i % 3);
+      for (let f = 0; f < fuN; f++) {
+        const fd = dOff(-age + 6 + f * 9);
+        rec.followups.push({
+          id: uid('fu'), date: fd,
+          method: ['email', 'meeting', 'phone', 'letter', 'whatsapp'][f % 5],
+          fuType: ['firstReminder', 'secondReminder', 'urgentReminder', 'requestUpdate'][f % 4],
+          sentToParty: partyName[it[4]], by: db.users[(f % 3) + 1].id,
+          comment: 'تمت المتابعة مع الجهة المسؤولة وطلب موافاتنا بالمستجدات وخطة المعالجة.',
+          requiredAction: 'تزويدنا بخطة معالجة وموعد إغلاق ملزم.',
+          nextDate: dOff(-age + 13 + f * 9), attachment: '', statusAfter: '',
+        });
+        rec.timeline.push({ at: iso(fd), by: db.users[(f % 3) + 1].id, action: 'followup', comment: 'متابعة — تذكير بالرد المطلوب.', oldVal: '', newVal: '', attachments: [] });
+      }
+      // responses
+      if (!['submitted', 'sent', 'pendingresp'].includes(status) && i % 3 !== 1) {
+        const rd = dOff(-Math.max(2, Math.floor(age / 2)));
+        const acc = status === 'closed' ? 'accepted' : ['pending', 'moreInfo', 'accepted'][i % 3];
+        rec.responses.push({
+          id: uid('rs'), date: rd, from: (con.contacts && con.contacts[0]) ? con.contacts[0].name : partyName[it[4]],
+          company: it[4] === 'contractor' ? (con.name || '') : partyName[it[4]],
+          summary: 'تم استلام رد رسمي يوضح خطة المعالجة والجدول الزمني المقترح.',
+          fullText: 'بالإشارة إلى المعوق المرصود، نفيدكم بأنه جارٍ التنسيق مع الجهات المعنية وتخصيص الموارد اللازمة، وسيتم موافاتكم بخطة تنفيذية خلال المدة المحددة.',
+          accepted: acc, furtherAction: acc === 'moreInfo' ? 'مطلوب تفاصيل فنية إضافية ومخطط معدل.' : '',
+          nextAction: acc === 'accepted' ? 'متابعة التنفيذ حتى الإغلاق.' : 'انتظار استكمال المتطلبات.',
+          newDue: '', attachment: 'response_letter.pdf',
+        });
+        rec.timeline.push({ at: iso(rd), by: rec.currentOwner, action: 'response', comment: 'تم استلام رد من ' + partyName[it[4]] + '.', oldVal: '', newVal: '', attachments: [] });
+      }
+      // evidence
+      rec.evidence.push({
+        id: uid('ev'), name: `IMG_${2200 + n}.jpg`, etype: 'photo', stage: 'before',
+        desc: 'توثيق حالة الموقع عند رصد المعوق', at: created, by: 'u3', dataUrl: null, linkedStatus: 'sent',
+      });
+      if (['inprogress', 'blocked', 'escalated', 'closed', 'reopened'].includes(status)) {
+        rec.evidence.push({
+          id: uid('ev'), name: `IMG_${2300 + n}.jpg`, etype: 'photo', stage: 'during',
+          desc: 'متابعة أعمال المعالجة في الموقع', at: dOff(-Math.floor(age / 2)), by: 'u4', dataUrl: null, linkedStatus: status,
+        });
+      }
+      if (status === 'escalated') {
+        rec.timeline.push({ at: iso(rec.escalatedAt), by: 'u2', action: 'escalation', comment: 'تصعيد للإدارة التنفيذية لتجاوز مهلة الرد دون معالجة.', oldVal: 'pendingresp', newVal: 'escalated', attachments: [] });
+      }
+      // closure (one closed-with-evidence, one closed-without for the dashboard highlight)
+      if (status === 'closed' || status === 'reopened') {
+        const cd = dOff(-Math.max(1, Math.floor(age / 5)));
+        const withEv = i % 4 !== 1;
+        if (withEv) rec.evidence.push({
+          id: uid('ev'), name: `IMG_${2400 + n}.jpg`, etype: 'photo', stage: 'closure',
+          desc: 'دليل إغلاق — الموقع بعد المعالجة النهائية', at: cd, by: 'u3', dataUrl: null, linkedStatus: 'closed',
+        });
+        rec.closures.push({
+          at: cd, by: 'u2', verifiedBy: 'u6',
+          comment: 'تمت معالجة المعوق بالكامل والتحقق ميدانياً من إزالة أسبابه.',
+          ctype: withEv ? 'withEvidence' : 'withoutEvidence',
+          evidence: withEv ? [`IMG_${2400 + n}.jpg`] : [], approved: true,
+        });
+        rec.closedAt = cd;
+        rec.timeline.push({ at: iso(cd), by: 'u2', action: 'closed', comment: 'تم إغلاق المعوق بعد التحقق من المعالجة.', oldVal: 'inprogress', newVal: 'closed', attachments: [] });
+        if (status === 'reopened') {
+          const rd2 = dOff(-2);
+          rec.reopenedAt = rd2;
+          rec.timeline.push({ at: iso(rd2), by: 'u2', action: 'reopened', comment: 'أُعيد فتح المعوق — تكرار المشكلة في نفس الموقع.', oldVal: 'closed', newVal: 'reopened', attachments: [] });
+        }
+      }
+      db.entities.constraint.push(rec);
+    }
+  });
+  db.counters.constraint = n;
 }
 
 /* ---------- Store API ---------- */
@@ -612,9 +810,27 @@ const Store = {
   load() {
     try {
       const raw = localStorage.getItem(DB_KEY);
-      if (raw) { this.db = JSON.parse(raw); return; }
+      if (raw) { this.db = JSON.parse(raw); this.migrate(); return; }
     } catch (e) { /* corrupted -> reseed */ }
     this.db = seedDB(); this.save();
+  },
+  // bring older saved databases up to date (new tracker module/entity)
+  migrate() {
+    let changed = false;
+    if (!this.db.schemas.constraint) { this.db.schemas.constraint = defaultSchemas().constraint; changed = true; }
+    if (!this.db.modules.some(m => m.key === 'tracker')) {
+      const mod = defaultModules().find(m => m.key === 'tracker');
+      const idx = this.db.modules.findIndex(m => m.key === 'issues');
+      this.db.modules.splice(idx >= 0 ? idx + 1 : this.db.modules.length, 0, mod);
+      changed = true;
+    }
+    if (!this.db.entities.constraint) { seedConstraintsFor(this.db); changed = true; }
+    this.db.roles.forEach(r => {
+      if (!r.modules.includes('*') && r.modules.includes('issues') && !r.modules.includes('tracker')) {
+        r.modules.push('tracker'); changed = true;
+      }
+    });
+    if (changed) this.save();
   },
   save() { localStorage.setItem(DB_KEY, JSON.stringify(this.db)); },
   reset() { localStorage.removeItem(DB_KEY); this.load(); },
@@ -692,6 +908,19 @@ const Store = {
   },
   setArchived(type, id, val) {
     this.update(type, id, { archived: val }, val ? (LANG === 'ar' ? 'تمت الأرشفة' : 'Archived') : (LANG === 'ar' ? 'تمت الاستعادة' : 'Restored'));
+  },
+
+  // rich activity-log entry (used by the tracker case files)
+  logTL(type, id, action, { comment = '', oldVal = '', newVal = '', attachments = [], company = '' } = {}) {
+    const rec = this.get(type, id); if (!rec) return null;
+    rec.timeline = rec.timeline || [];
+    rec.timeline.push({
+      at: new Date().toISOString().slice(0, 16).replace('T', 'T'),
+      by: this.db.currentUserId, action, comment, oldVal, newVal, attachments, company,
+    });
+    rec.updatedAt = todayISO();
+    this.save();
+    return rec;
   },
 
   contractor(id) { return this.db.contractors.find(c => c.id === id); },

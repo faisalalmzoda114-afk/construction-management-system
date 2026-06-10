@@ -77,7 +77,7 @@ const ModContractors = {
     const trendVals = [score - 7, score - 4, score - 6, score - 2, score - 1, score].map(v => Math.max(40, v));
 
     const linkSections = [
-      ['issue', '🧩', t('mIssues')], ['risk', '🛡️', t('mRisks')],
+      ['constraint', '🚩', t('mTracker')], ['issue', '🧩', t('mIssues')], ['risk', '🛡️', t('mRisks')],
       ['observation', '📸', t('mObservations')], ['action', '⚡', t('mActions')],
       ['correspondence', '✉️', t('mCorrespondence')], ['meeting', '🗓️', t('mMeetings')],
     ];

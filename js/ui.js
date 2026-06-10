@@ -102,6 +102,10 @@ const UI = {
       design: LANG === 'ar' ? 'تصميم' : 'Design', procurement: LANG === 'ar' ? 'مشتريات' : 'Procurement',
       construction: LANG === 'ar' ? 'تنفيذ' : 'Construction', commissioning: LANG === 'ar' ? 'تشغيل' : 'Commissioning',
       handover: LANG === 'ar' ? 'تسليم' : 'Handover',
+      consultant: LANG === 'ar' ? 'الاستشاري' : 'Consultant', developer: LANG === 'ar' ? 'المطور' : 'Developer',
+      client: LANG === 'ar' ? 'العميل' : 'Client', internal: LANG === 'ar' ? 'فريق المشروع' : 'Internal Team',
+      contractor: LANG === 'ar' ? 'المقاول' : 'Contractor',
+      constraint: LANG === 'ar' ? 'معوق / مشكلة' : 'Issue / Constraint',
     };
     return map[key] || key;
   },

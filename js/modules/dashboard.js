@@ -96,7 +96,7 @@ const ModExec = {
         </div>
       </div>
 
-      <div class="grid g2" style="margin-bottom:16px">
+      <div class="grid g3" style="margin-bottom:16px">
         <!-- top issues -->
         <div class="panel">
           <div class="panel-h"><span>🧩</span><h3>${t('topIssues')}</h3><div class="spacer"></div>
@@ -108,6 +108,23 @@ const ModExec = {
                 <div class="fs11 mut">${esc(i.ref)} · ${UI.catLabel('issue', i.category)}</div></div>
               ${UI.prioChip(i.severity)}
             </div>`).join('') : UI.empty('🧩')}
+        </div>
+        <!-- critical open constraints -->
+        <div class="panel">
+          <div class="panel-h"><span>🚩</span><h3>${LANG === 'ar' ? 'معوقات حرجة مفتوحة' : 'Critical Open Constraints'}</h3><div class="spacer"></div>
+            <button class="btn sm ghost" data-nav="tracker">${t('view')} ←</button></div>
+          ${(() => {
+            const cst = Store.list('constraint').filter(c => !Store.isClosed('constraint', c))
+              .sort((a, b) => (['critical', 'high', 'medium', 'low'].indexOf(a.priority) - ['critical', 'high', 'medium', 'low'].indexOf(b.priority)) || ModTracker.daysOverdue(b) - ModTracker.daysOverdue(a))
+              .slice(0, 8);
+            return cst.length ? cst.map(c => `
+              <div class="rank-row clickable" data-det="constraint|${c.id}">
+                <span class="prio-dot" style="background:${UI.prioColors[c.priority]}"></span>
+                <div style="flex:1;min-width:0"><div class="fs13 b" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(c.title)}</div>
+                  <div class="fs11 mut">${esc(c.ref)} · ${UI.optLabel(c.responsibleParty)}</div></div>
+                ${ModTracker.daysOverdue(c) ? `<span class="chip" style="--cc:#f87171">⏰ ${ModTracker.daysOverdue(c)}${LANG === 'ar' ? 'ي' : 'd'}</span>` : UI.statusChip('constraint', c.status)}
+              </div>`).join('') : UI.empty('🎉');
+          })()}
         </div>
         <!-- contractor ranking -->
         <div class="panel">

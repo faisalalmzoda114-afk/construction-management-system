@@ -335,6 +335,18 @@ label.fl .req{color:var(--red)}
 }
 [dir="rtl"] .modal{transform:translate(50%,-50%)}
 .modal.wide{width:min(900px,96vw)}
+.modal.case{width:min(1060px,97vw);height:92vh;max-height:92vh}
+.modal.case .module-tabs{margin-bottom:0;flex-shrink:0}
+.modal.case .module-tabs button{padding:9px 13px;font-size:12px}
+
+/* ============ Evidence gallery (tracker case files) ============ */
+.ev-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:12px;margin-bottom:10px}
+.ev-card{background:var(--panel);border:1px solid var(--line);border-radius:12px;overflow:hidden;cursor:pointer;transition:.15s}
+.ev-card:hover{border-color:var(--accent-2);transform:translateY(-2px)}
+.ev-ph{height:108px;display:grid;place-items:center;background:var(--panel-2);font-size:38px;overflow:hidden}
+.ev-ph img{width:100%;height:100%;object-fit:cover}
+.ev-meta{padding:8px 11px}
+.ev-thumb{width:42px;height:42px;object-fit:cover;border-radius:8px;cursor:pointer;border:1px solid var(--line-2)}
 .x-btn{
   width:32px;height:32px;border-radius:9px;display:grid;place-items:center;cursor:pointer;border:1px solid var(--line);
   background:var(--panel);color:var(--txt-2);font-size:15px;flex-shrink:0;

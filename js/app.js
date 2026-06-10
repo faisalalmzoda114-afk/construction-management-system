@@ -14,6 +14,7 @@ const App = {
     actions: c => ModActions.render(c),
     risks: c => ModRisks.render(c),
     issues: c => ModIssues.render(c),
+    tracker: c => ModTracker.render(c),
     observations: c => ModObservations.render(c),
     contractors: (c, p) => ModContractors.render(c, p),
     correspondence: c => ModCorrespondence.render(c),
@@ -267,6 +268,10 @@ const App = {
       if (key === 'risks') {
         const n = Store.list('risk').filter(r => !Store.isClosed('risk', r) && Store.riskScore(r) >= 15).length;
         return n ? `<span class="badge warn">${n}</span>` : '';
+      }
+      if (key === 'tracker') {
+        const n = Store.list('constraint').filter(c => !Store.isClosed('constraint', c) && ModTracker.daysOverdue(c) > 0).length;
+        return n ? `<span class="badge">${n}</span>` : '';
       }
       return '';
     };

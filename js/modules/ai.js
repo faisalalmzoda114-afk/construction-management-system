@@ -262,6 +262,141 @@ ${held.filter(m => m.decisions).slice(0, 2).map(m => `• ${m.title}: ${m.decisi
 Next: ${up.slice(0, 4).map(m => `${UI.fmtDate(m.date)} ${m.title}`).join(' · ') || '—'}`;
   },
 
+  /* ---------- issue & constraint tracking ---------- */
+  trackerReport() {
+    const p = Store.cur();
+    const all = Store.list('constraint');
+    const open = all.filter(r => !Store.isClosed('constraint', r));
+    const overdue = open.filter(r => ModTracker.daysOverdue(r) > 0).sort((a, b) => ModTracker.daysOverdue(b) - ModTracker.daysOverdue(a));
+    const noResp = open.filter(r => ModTracker.respState(r) === 'none');
+    const noEv = all.filter(r => ModTracker.closedNoEvidence(r));
+    const escalated = open.filter(r => r.status === 'escalated');
+    const byParty = {};
+    open.forEach(r => byParty[r.responsibleParty] = (byParty[r.responsibleParty] || 0) + 1);
+    const parties = Object.entries(byParty).sort((a, b) => b[1] - a[1]);
+    const byCon = {};
+    all.forEach(r => { if (r.contractor) byCon[r.contractor] = (byCon[r.contractor] || 0) + 1; });
+    const repeat = Object.entries(byCon).filter(x => x[1] >= 3).sort((a, b) => b[1] - a[1]);
+    if (this.ar()) return `🚩 التقرير الأسبوعي للمعوقات والمشاكل — ${p.name} (${p.code})
+التاريخ: ${UI.fmtDate(todayISO())}
+
+الملخص:
+${all.length} معوقاً مسجلاً · ${open.length} مفتوحاً · ${overdue.length} متأخراً · ${escalated.length} مُصعَّداً · ${noResp.length} بلا أي رد.
+
+أعلى تركّز حسب الجهة المسؤولة:
+${parties.map(([k, v]) => `• ${UI.optLabel(k)}: ${v}`).join('\n') || '—'}
+
+الأكثر تأخراً (تتطلب تدخلاً فورياً):
+${overdue.slice(0, 5).map((r, i) => `${i + 1}. [${r.ref}] ${r.title} — متأخر ${ModTracker.daysOverdue(r)} يوماً — ${UI.optLabel(r.responsibleParty)} — ${tl(Store.statusDef('constraint', r.status).label)}`).join('\n') || 'لا يوجد.'}
+
+معوقات بلا رد إطلاقاً (${noResp.length}):
+${noResp.slice(0, 5).map(r => `• [${r.ref}] ${r.title} — مفتوح منذ ${ModTracker.daysOpen(r)} يوماً`).join('\n') || '—'}
+
+أُغلقت بدون دليل (${noEv.length}):
+${noEv.slice(0, 5).map(r => `• [${r.ref}] ${r.title}`).join('\n') || '—'}
+
+تكرار ملحوظ حسب المقاول:
+${repeat.map(([cid, n]) => `• ${(Store.contractor(cid) || {}).name || cid}: ${n} معوقات`).join('\n') || 'لا تكرار ملحوظ.'}
+
+التوصيات:
+1. تصعيد المعوقات المتأخرة أكثر من 14 يوماً (${open.filter(r => ModTracker.daysOverdue(r) > 14).length}) للجنة التوجيهية.
+2. إرسال تذكير عاجل لكل معوق بلا رد، وتوثيق المتابعة في النظام.
+3. استكمال أدلة الإغلاق للمعوقات المغلقة دون توثيق.`;
+    return `🚩 Weekly Issues & Constraints Report — ${p.nameEn} (${p.code})
+Date: ${UI.fmtDate(todayISO())}
+
+Summary: ${all.length} total · ${open.length} open · ${overdue.length} overdue · ${escalated.length} escalated · ${noResp.length} without any response.
+
+Top overdue:
+${overdue.slice(0, 5).map((r, i) => `${i + 1}. [${r.ref}] ${r.title} — ${ModTracker.daysOverdue(r)}d late — ${UI.optLabel(r.responsibleParty)}`).join('\n') || 'None.'}
+
+No response yet: ${noResp.slice(0, 5).map(r => `[${r.ref}]`).join(' ') || '—'}
+Closed without evidence: ${noEv.length}
+Repeated by contractor: ${repeat.map(([cid, n]) => `${(Store.contractor(cid) || {}).nameEn || cid} (${n})`).join(' · ') || 'none'}
+
+Recommendations: escalate items overdue >14 days, send urgent reminders for unanswered items, complete closure evidence.`;
+  },
+
+  constraintCase(r) {
+    const tlTxt = (r.timeline || []).slice(-8).map(e => {
+      const lbl = (TRK.tlActions[e.action] || ['•', () => e.action])[1]();
+      return `• ${(e.at || '').slice(0, 10)} — ${lbl}${e.comment ? ': ' + e.comment.slice(0, 90) : ''}`;
+    }).join('\n');
+    const lastR = ModTracker.lastResp(r);
+    const lastF = ModTracker.lastFU(r);
+    const delayed = ModTracker.daysOverdue(r) > 0 || ModTracker.respState(r) === 'none';
+    if (this.ar()) return `🚩 ملخص حالة المعوق — ${r.ref}${r.extRef ? ' · ' + r.extRef : ''}
+العنوان: ${r.title}
+الموقع: ${r.zone || '—'} — ${r.street || '—'}
+الحالة الحالية: ${tl(Store.statusDef('constraint', r.status).label)} · الأولوية: ${UI.prioLabel(r.priority)}
+الجهة المسؤولة: ${UI.optLabel(r.responsibleParty)} · المالك الحالي: ${Store.userName(r.currentOwner)}
+أُرسل إلى: ${r.sentTo || '—'}
+
+التواريخ: أُنشئ ${UI.fmtDate(r.createdAt)} · أُرسل ${UI.fmtDate(r.sentAt)} · يستحق ${UI.fmtDate(r.dueDate)}${r.closedAt ? ' · أُغلق ' + UI.fmtDate(r.closedAt) : ''}
+مفتوح منذ: ${ModTracker.daysOpen(r)} يوماً · متأخر: ${ModTracker.daysOverdue(r)} يوماً · منذ آخر تحديث: ${ModTracker.daysSinceUpdate(r)} يوماً
+
+المتابعات: ${(r.followups || []).length} (آخرها ${lastF ? UI.fmtDate(lastF.date) : '—'})
+الردود: ${(r.responses || []).length}${lastR ? ` (آخر رد ${UI.fmtDate(lastR.date)}: ${lastR.summary.slice(0, 80)})` : ' — لا يوجد رد حتى الآن'}
+الأدلة: ${(r.evidence || []).length} مرفقاً${ModTracker.hasClosureEv(r) ? ' (يشمل دليل إغلاق)' : ''}
+
+من يؤخر الملف؟ ${delayed ? `المؤشرات تشير إلى ${UI.optLabel(r.responsibleParty)} — ${ModTracker.respState(r) === 'none' ? 'لم يقدم أي رد منذ الإرسال' : 'تجاوز تاريخ الاستحقاق دون إغلاق'}.` : 'لا يوجد تعثر واضح حالياً.'}
+
+الإجراء التالي المقترح:
+${ModTracker.nextAction(r)}
+
+آخر تحركات الخط الزمني:
+${tlTxt || '—'}`;
+    return `🚩 Issue Case Summary — ${r.ref}
+Title: ${r.title}
+Location: ${r.zone || '—'} — ${r.street || '—'}
+Status: ${tl(Store.statusDef('constraint', r.status).label)} · Priority: ${UI.prioLabel(r.priority)}
+Responsible: ${UI.optLabel(r.responsibleParty)} · Owner: ${Store.userName(r.currentOwner)}
+Created ${UI.fmtDate(r.createdAt)} · sent ${UI.fmtDate(r.sentAt)} · due ${UI.fmtDate(r.dueDate)}${r.closedAt ? ' · closed ' + UI.fmtDate(r.closedAt) : ''}
+Open ${ModTracker.daysOpen(r)}d · overdue ${ModTracker.daysOverdue(r)}d
+Follow-ups: ${(r.followups || []).length} · Responses: ${(r.responses || []).length}${lastR ? ` (last: ${lastR.summary.slice(0, 70)})` : ' — none yet'}
+Who is delaying? ${delayed ? UI.optLabel(r.responsibleParty) : 'no clear blocker'}
+Next action: ${ModTracker.nextAction(r)}
+Recent timeline:
+${tlTxt || '—'}`;
+  },
+
+  constraintEmail(r, kind) {
+    const esc2 = kind === 'escalation';
+    const ov = ModTracker.daysOverdue(r);
+    if (this.ar()) return `${esc2 ? '🚨 بريد تصعيد' : '✉️ بريد متابعة'} — مولّد تلقائياً
+
+إلى: ${r.sentTo || UI.optLabel(r.responsibleParty)}${esc2 ? '\nنسخة: الإدارة التنفيذية — اللجنة التوجيهية' : ''}
+الموضوع: ${esc2 ? 'تصعيد' : 'متابعة'} — ${r.title} (${r.ref}${r.extRef ? ' / ' + r.extRef : ''})
+
+السادة الأفاضل،
+
+بالإشارة إلى المعوق المسجل أعلاه بموقع ${r.zone || '—'} — ${r.street || '—'}، والمرسل إليكم بتاريخ ${UI.fmtDate(r.sentAt)}، ${ov > 0 ? `نفيدكم بأن مهلة المعالجة قد تجاوزت ${ov} يوماً دون إغلاق،` : 'نأمل موافاتنا بمستجدات المعالجة،'} ${ModTracker.respState(r) === 'none' ? 'علماً بأنه لم يصلنا أي رد رسمي حتى تاريخه.' : ''}
+
+${esc2
+  ? `ونظراً لأثر المعوق المباشر على ${r.impactedActivity || 'الأعمال الحرجة'}${r.impactedMilestone ? ` والمعلم التعاقدي (${r.impactedMilestone})` : ''}، فقد تم تصعيد الموضوع للإدارة التنفيذية، ونطلب منكم:
+1. تسمية مسؤول مباشر للمعالجة خلال 24 ساعة.
+2. خطة معالجة بمدد ملزمة خلال 48 ساعة.
+3. اجتماع طارئ لمناقشة العوائق إن لزم.`
+  : `وعليه نطلب منكم:
+1. موافاتنا بخطة المعالجة وموعد الإغلاق المتوقع.
+2. تحديد أي متطلبات من جانبنا لتسريع الحل.
+3. الرد خلال (3) أيام عمل من تاريخه.`}
+
+وتفضلوا بقبول فائق الاحترام،
+${Store.userName(Store.db.currentUserId) || 'إدارة المشروع'} — ${(Store.cur() || {}).name || ''}`;
+    return `${esc2 ? '🚨 Escalation Email' : '✉️ Follow-up Email'} — auto-generated
+
+To: ${r.sentTo || UI.optLabel(r.responsibleParty)}${esc2 ? '\nCc: Executive Management — Steering Committee' : ''}
+Subject: ${esc2 ? 'ESCALATION' : 'Follow-up'} — ${r.title} (${r.ref})
+
+Dear Sir/Madam,
+Reference the above constraint at ${r.zone || '—'} — ${r.street || '—'}, sent on ${UI.fmtDate(r.sentAt)}. ${ov > 0 ? `It is now ${ov} days overdue.` : 'Kindly provide a status update.'} ${ModTracker.respState(r) === 'none' ? 'No formal response has been received to date.' : ''}
+${esc2 ? 'Given the direct impact on critical works, this matter has been escalated. Please nominate a focal point within 24h and submit a committed action plan within 48h.' : 'Please provide your treatment plan and expected closure date within three (3) working days.'}
+
+Regards,
+${Store.userName(Store.db.currentUserId) || 'Project Management'}`;
+  },
+
   showReport(text, title) {
     const m = UI.modal(`
       <div class="drawer-h"><h2>✨ ${esc(title)}</h2><button class="x-btn" data-close>✕</button></div>
@@ -275,6 +410,7 @@ Next: ${up.slice(0, 4).map(m => `${UI.fmtDate(m.date)} ${m.title}`).join(' · ')
 
   answer(q) {
     const s = q.toLowerCase();
+    if (/(معوق|معوقات|عائق|constraint|blocker|tracking)/.test(s)) return this.trackerReport();
     if (/(خطر|مخاطر|risk)/.test(s)) return this.riskReport();
     if (/(صحة|health)/.test(s)) return this.healthReport();
     if (/(محضر|mom|minute)/.test(s)) return this.generateMOM();
@@ -284,8 +420,8 @@ Next: ${up.slice(0, 4).map(m => `${UI.fmtDate(m.date)} ${m.title}`).join(' · ')
     if (/(درس|دروس|lesson)/.test(s)) return this.lessonsDigest();
     if (/(ملخص|تنفيذي|summary|executive)/.test(s)) return this.execSummary();
     return this.ar()
-      ? `يمكنني توليد التقارير التالية من بيانات مشروعك الحالية:\n• تحليل المخاطر — اكتب "المخاطر"\n• تقرير صحة المشروع — "صحة"\n• ملخص تنفيذي — "ملخص"\n• محضر اجتماع — "محضر"\n• ملخص المراسلات — "المراسلات"\n• تقييم المقاولين — "المقاولين"\n• خلاصة الدروس المستفادة — "الدروس"`
-      : `I can generate from your live project data:\n• Risk analysis — type "risks"\n• Health report — "health"\n• Executive summary — "summary"\n• MOM — "mom"\n• Correspondence summary — "letters"\n• Contractor review — "contractors"\n• Lessons digest — "lessons"`;
+      ? `يمكنني توليد التقارير التالية من بيانات مشروعك الحالية:\n• تحليل المخاطر — اكتب "المخاطر"\n• تقرير المعوقات الأسبوعي — "المعوقات"\n• تقرير صحة المشروع — "صحة"\n• ملخص تنفيذي — "ملخص"\n• محضر اجتماع — "محضر"\n• ملخص المراسلات — "المراسلات"\n• تقييم المقاولين — "المقاولين"\n• خلاصة الدروس المستفادة — "الدروس"`
+      : `I can generate from your live project data:\n• Risk analysis — type "risks"\n• Constraints report — "constraints"\n• Health report — "health"\n• Executive summary — "summary"\n• MOM — "mom"\n• Correspondence summary — "letters"\n• Contractor review — "contractors"\n• Lessons digest — "lessons"`;
   },
 };
 
@@ -303,6 +439,7 @@ const ModAI = {
       [t('aiSummarizeMeetings'), () => AIBrain.meetingsSummary()],
       [t('aiCorrSummary'), () => AIBrain.corrSummary()],
       [t('aiContractorReview'), () => AIBrain.contractorReview()],
+      [t('aiTrackerReport'), () => AIBrain.trackerReport()],
       [t('aiLessons'), () => AIBrain.lessonsDigest()],
     ];
     container.innerHTML = `

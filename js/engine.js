@@ -215,6 +215,8 @@ const Engine = {
 
   /* ============ detail drawer ============ */
   detail(type, id, onChange) {
+    // constraint records open as full case files in the tracker module
+    if (type === 'constraint' && typeof ModTracker !== 'undefined') return ModTracker.openDetail(id, onChange);
     const rec = Store.get(type, id);
     if (!rec) return;
     const sch = Store.schema(type);
@@ -251,6 +253,8 @@ const Engine = {
             ${UI.statusChip('action', a.status)}
           </div>`).join('') : `<div class="fs12 mut">${t('noData')}</div>`}
         ${type !== 'action' ? `<button class="btn sm mt8" id="dt-mkaction">⚡ ＋ ${LANG === 'ar' ? 'إنشاء إجراء من هذا السجل' : 'Create action from this record'}</button>` : ''}
+        ${['observation', 'meeting', 'correspondence'].includes(type) && Store.db.schemas.constraint ? `
+          <button class="btn sm gold mt8" id="dt-mkcst">🚩 ${LANG === 'ar' ? 'تحويل إلى معوق / مشكلة' : 'Convert to Issue / Constraint'}</button>` : ''}
         <div class="section-t">🕓 ${t('history')}</div>
         ${(rec.history || []).slice().reverse().map(h => `
           <div class="hist-item">${UI.avatar(h.by)}<div class="h-body"><div class="fs12">${esc(h.text)}</div>
@@ -276,6 +280,11 @@ const Engine = {
     if (escBtn) escBtn.onclick = () => {
       Store.update(type, id, { status: 'escalated' }, LANG === 'ar' ? '🚨 تم التصعيد للإدارة التنفيذية' : '🚨 Escalated to executive management');
       UI.toast(t('escalated')); refresh();
+    };
+    const mkCst = dr.el.querySelector('#dt-mkcst');
+    if (mkCst) mkCst.onclick = () => {
+      dr.close();
+      ModTracker.createFrom(type, rec, onChange);
     };
     const mkAct = dr.el.querySelector('#dt-mkaction');
     if (mkAct) mkAct.onclick = () => {

@@ -19,6 +19,7 @@ const I18N = {
     // modules
     mExec: 'مركز القيادة التنفيذية', mPortfolio: 'محفظة المشاريع', mActions: 'مركز إدارة الإجراءات',
     mRisks: 'مركز ذكاء المخاطر', mIssues: 'مركز إدارة المعضلات', mObservations: 'مركز الملاحظات الميدانية',
+    mTracker: 'مركز تتبع المعوقات والمشاكل', aiTrackerReport: 'تقرير المعوقات الأسبوعي',
     mContractors: 'مركز أداء المقاولين', mCorrespondence: 'مركز المراسلات', mMeetings: 'مركز إدارة الاجتماعات',
     mLessons: 'مركز الدروس المستفادة', mDocuments: 'مركز ضبط الوثائق', mDashBuilder: 'منشئ لوحات المعلومات',
     mWorkflow: 'منشئ مسارات العمل', mAI: 'المساعد الذكي', mAdmin: 'مركز التحكم الإداري',
@@ -102,6 +103,7 @@ const I18N = {
     gCommand: 'Command', gExecution: 'Execution', gKnowledge: 'Knowledge & Docs', gPlatform: 'Platform',
     mExec: 'Executive Command Center', mPortfolio: 'Project Portfolio', mActions: 'Action Management Center',
     mRisks: 'Risk Intelligence Center', mIssues: 'Issues Management Center', mObservations: 'Site Observation Center',
+    mTracker: 'Issue & Constraint Tracking Center', aiTrackerReport: 'Weekly Constraints Report',
     mContractors: 'Contractor Performance Center', mCorrespondence: 'Correspondence Center', mMeetings: 'Meeting Management Center',
     mLessons: 'Lessons Learned Center', mDocuments: 'Document Control Center', mDashBuilder: 'Dashboard Builder',
     mWorkflow: 'Workflow Builder', mAI: 'AI Assistant', mAdmin: 'Admin Control Center',

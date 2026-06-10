@@ -630,6 +630,30 @@ const Store = {
   cur() { return this.db.projects.find(p => p.id === this.db.currentProjectId) || null; },
   setProject(id) { this.db.currentProjectId = id; this.save(); },
 
+  createProject(data) {
+    let n = (this.db.counters.project || this.db.projects.length) + 1;
+    while (this.db.projects.some(p => p.id === 'p' + n)) n++;
+    this.db.counters.project = n;
+    const p = Object.assign({
+      id: 'p' + n,
+      progress: 0, plannedProgress: 0, budget: 0, icon: '🏗️', milestones: [],
+    }, data);
+    this.db.projects.push(p); this.save();
+    return p;
+  },
+  updateProject(id, patch) {
+    const p = this.db.projects.find(x => x.id === id); if (!p) return null;
+    Object.assign(p, patch); this.save();
+    return p;
+  },
+  deleteProject(id) {
+    this.db.projects = this.db.projects.filter(p => p.id !== id);
+    if (this.db.currentProjectId === id) {
+      this.db.currentProjectId = (this.db.projects[0] || {}).id || null;
+    }
+    this.save();
+  },
+
   schema(type) { return this.db.schemas[type]; },
   statusDef(type, key) { return (this.schema(type).statuses || []).find(s => s.key === key); },
   isClosed(type, rec) { const s = this.statusDef(type, rec.status); return s ? !!s.closed : false; },

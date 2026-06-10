@@ -3,12 +3,16 @@
    ============================================================ */
 const I18N = {
   ar: {
-    appName: 'منصة مشاريع التشييد', appTag: 'Project OS — نظام تشغيل المشاريع',
+    appName: 'منصة مشاريع التشييد', appTag: 'Project OS — نظام تشغيل المشاريع', theme: 'الثيم',
     login: 'تسجيل الدخول', loginAs: 'الدخول بصفة', welcome: 'مرحباً بك',
     loginHint: 'اختر المستخدم للدخول إلى المنصة',
     selectProject: 'مركز اختيار المشاريع', selectProjectHint: 'اختر مشروعاً للمتابعة — يتحكم المشروع المختار بجميع الوحدات',
     portfolioDash: 'لوحة المحفظة', allProjects: 'كل المشاريع', switchProject: 'تبديل المشروع',
     groupBy: 'تجميع حسب', program: 'البرنامج', region: 'المنطقة', client: 'العميل', package: 'الحزمة', contractor: 'المقاول',
+    newProject: 'مشروع جديد', editProject: 'تعديل المشروع', projectCode: 'رمز المشروع', projectNameAr: 'اسم المشروع (عربي)',
+    projectNameEn: 'اسم المشروع (إنجليزي)', projectIcon: 'أيقونة المشروع', plannedProgress: 'الإنجاز المخطط',
+    milestones: 'المعالم الرئيسية', milestoneTitle: 'عنوان المعلم', milestoneDate: 'التاريخ', addMilestone: '+ إضافة معلم',
+    confirmDeleteProject: 'سيتم حذف المشروع نهائياً. هل أنت متأكد؟',
     searchProjects: 'بحث في المشاريع…', search: 'بحث…', logout: 'تسجيل الخروج',
     // nav groups
     gCommand: 'القيادة', gExecution: 'التنفيذ', gKnowledge: 'المعرفة والوثائق', gPlatform: 'المنصة',
@@ -84,12 +88,16 @@ const I18N = {
     months: ['يناير','فبراير','مارس','أبريل','مايو','يونيو','يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر'],
   },
   en: {
-    appName: 'Construction Project OS', appTag: 'Project Operating System',
+    appName: 'Construction Project OS', appTag: 'Project Operating System', theme: 'Theme',
     login: 'Sign In', loginAs: 'Sign in as', welcome: 'Welcome',
     loginHint: 'Select a user to enter the platform',
     selectProject: 'Project Selection Center', selectProjectHint: 'Select a project to continue — the selected project drives all modules',
     portfolioDash: 'Portfolio Dashboard', allProjects: 'All Projects', switchProject: 'Switch Project',
     groupBy: 'Group by', program: 'Program', region: 'Region', client: 'Client', package: 'Package', contractor: 'Contractor',
+    newProject: 'New Project', editProject: 'Edit Project', projectCode: 'Project Code', projectNameAr: 'Project Name (Arabic)',
+    projectNameEn: 'Project Name (English)', projectIcon: 'Project Icon', plannedProgress: 'Planned Progress',
+    milestones: 'Key Milestones', milestoneTitle: 'Milestone Title', milestoneDate: 'Date', addMilestone: '+ Add Milestone',
+    confirmDeleteProject: 'This project will be permanently deleted. Are you sure?',
     searchProjects: 'Search projects…', search: 'Search…', logout: 'Sign Out',
     gCommand: 'Command', gExecution: 'Execution', gKnowledge: 'Knowledge & Docs', gPlatform: 'Platform',
     mExec: 'Executive Command Center', mPortfolio: 'Project Portfolio', mActions: 'Action Management Center',
@@ -166,3 +174,20 @@ function setLang(l){
   document.documentElement.dir = l === 'ar' ? 'rtl' : 'ltr';
 }
 setLang(LANG);
+
+/* ============ themes ============ */
+const THEMES = [
+  { key: 'dark',    icon: '🌌', label: { ar: 'غرفة العمليات', en: 'War Room' } },
+  { key: 'desert',  icon: '🏜️', label: { ar: 'الصحراء', en: 'Desert' } },
+  { key: 'emerald', icon: '🌿', label: { ar: 'الزمردي', en: 'Emerald' } },
+  { key: 'royal',   icon: '👑', label: { ar: 'الملكي', en: 'Royal' } },
+  { key: 'light',   icon: '☀️', label: { ar: 'فاتح', en: 'Light' } },
+];
+let THEME = localStorage.getItem('cpos_theme') || 'dark';
+function setTheme(k){
+  THEME = k;
+  localStorage.setItem('cpos_theme', k);
+  if (k === 'dark') document.documentElement.removeAttribute('data-theme');
+  else document.documentElement.setAttribute('data-theme', k);
+}
+setTheme(THEME);

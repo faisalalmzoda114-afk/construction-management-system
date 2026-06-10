@@ -567,6 +567,7 @@ const ModTracker = {
           <div><div class="fs11 b mut2">${TX('الإجراء التالي المقترح', 'Suggested next action')}</div>
           <div class="fs13">${esc(nextAction)}</div></div>
           <div class="spacer"></div>
+          <button class="btn sm" id="ov-edit">✏️ ${t('edit')}</button>
           <button class="btn sm gold" id="ov-ai">✨ ${TX('تلخيص الحالة', 'Summarize')}</button>
           <button class="btn sm" id="ov-fu-mail">✉️ ${TX('بريد متابعة', 'Follow-up email')}</button>
           <button class="btn sm" id="ov-esc-mail">🚨 ${TX('بريد تصعيد', 'Escalation email')}</button>
@@ -590,6 +591,7 @@ const ModTracker = {
           <div class="fs11 mut mt8">${TX('اختيار "مغلق" يفتح نموذج الإغلاق الإلزامي مع الأدلة.', 'Choosing "Closed" opens the mandatory closure form with evidence.')}</div>
         </div>
       </div>`;
+    body.querySelector('#ov-edit').onclick = () => this.editForm(r, () => refresh());
     body.querySelector('#ov-st-go').onclick = () => {
       const st = body.querySelector('#ov-st').value;
       if (st === r.status) return;
@@ -734,6 +736,58 @@ const ModTracker = {
         </div>`;
       }).join('') || UI.empty('💬', TX('لا ردود مسجلة — أرسل متابعة', 'No responses yet — send a follow-up'))}`;
     body.querySelector('#rs-add').onclick = () => this.respForm(r, () => refresh('responses'));
+  },
+
+  editForm(r, onDone) {
+    const m = UI.modal(`
+      <div class="drawer-h"><h2>✏️ ${TX('تعديل بيانات الملف', 'Edit case file')} — ${esc(r.ref)}</h2><button class="x-btn" data-close>✕</button></div>
+      <div class="drawer-b"><div class="form-grid">
+        <div class="full"><label class="fl">${TX('العنوان', 'Title')} <span class="req">*</span></label><input class="input" id="ed-title" value="${esc(r.title)}" required></div>
+        <div class="full"><label class="fl">${TX('الوصف', 'Description')}</label><textarea class="input" id="ed-desc" style="height:80px">${esc(r.description || '')}</textarea></div>
+        <div><label class="fl">${TX('الأولوية', 'Priority')}</label><select class="input" id="ed-pri" value="${r.priority || 'medium'}">
+          <option value="low">${TX('منخفضة', 'Low')}</option>
+          <option value="medium" selected>${TX('متوسطة', 'Medium')}</option>
+          <option value="high">${TX('عالية', 'High')}</option></select></div>
+        <div><label class="fl">${TX('الخطورة', 'Severity')}</label><select class="input" id="ed-sev" value="${r.severity || 'medium'}">
+          <option value="low">${TX('منخفضة', 'Low')}</option>
+          <option value="medium" selected>${TX('متوسطة', 'Medium')}</option>
+          <option value="high">${TX('عالية', 'High')}</option>
+          <option value="critical">${TX('حرجة', 'Critical')}</option></select></div>
+        <div><label class="fl">${TX('تاريخ الاستحقاق', 'Due Date')}</label><input type="date" class="input" id="ed-due" value="${r.dueDate || ''}"></div>
+        <div><label class="fl">${TX('الإغلاق المستهدف', 'Target Closure')}</label><input type="date" class="input" id="ed-tc" value="${r.targetClosure || ''}"></div>
+        <div class="full"><label class="fl">${TX('ملاحظات', 'Notes')}</label><textarea class="input" id="ed-notes" style="height:60px">${esc(r.notes || '')}</textarea></div>
+        <div class="full"><label class="fl">${TX('الوسوم (افصل بفاصلة)', 'Tags (comma separated)')}</label><input class="input" id="ed-tags" value="${(r.tags || []).join(', ')}"></div>
+      </div></div>
+      <div class="drawer-f"><button class="btn primary" id="ed-save">💾 ${t('save')}</button><button class="btn" data-close>${t('cancel')}</button></div>`, { wide: true });
+
+    m.el.querySelector('#ed-save').onclick = () => {
+      const title = m.el.querySelector('#ed-title').value.trim();
+      if (!title) { UI.toast(t('required'), 'err'); return; }
+
+      const changes = [];
+      if (title !== r.title) { changes.push({ field: 'title', old: r.title, new: title }); r.title = title; }
+      const desc = m.el.querySelector('#ed-desc').value.trim();
+      if (desc !== r.description) { changes.push({ field: 'description', old: r.description || '', new: desc }); r.description = desc; }
+      const pri = m.el.querySelector('#ed-pri').value;
+      if (pri !== r.priority) { changes.push({ field: 'priority', old: r.priority, new: pri }); r.priority = pri; }
+      const sev = m.el.querySelector('#ed-sev').value;
+      if (sev !== r.severity) { changes.push({ field: 'severity', old: r.severity, new: sev }); r.severity = sev; }
+      const due = m.el.querySelector('#ed-due').value;
+      if (due !== (r.dueDate || '')) { changes.push({ field: 'dueDate', old: r.dueDate, new: due }); r.dueDate = due; }
+      const tc = m.el.querySelector('#ed-tc').value;
+      if (tc !== (r.targetClosure || '')) { changes.push({ field: 'targetClosure', old: r.targetClosure, new: tc }); r.targetClosure = tc; }
+      const notes = m.el.querySelector('#ed-notes').value.trim();
+      if (notes !== (r.notes || '')) { changes.push({ field: 'notes', old: r.notes || '', new: notes }); r.notes = notes; }
+      const tags = m.el.querySelector('#ed-tags').value.split(',').map(t => t.trim()).filter(t => t);
+      if (JSON.stringify(tags) !== JSON.stringify(r.tags || [])) { changes.push({ field: 'tags', old: (r.tags || []).join(', '), new: tags.join(', ') }); r.tags = tags; }
+
+      if (changes.length === 0) { UI.toast(TX('لا تغييرات', 'No changes')); m.close(); return; }
+
+      changes.forEach(c => {
+        Store.logTL('constraint', r.id, 'edit', { comment: `${c.field} updated`, oldVal: c.old, newVal: c.new });
+      });
+      m.close(); UI.toast(t('saved')); if (onDone) onDone();
+    };
   },
 
   respForm(r, onDone) {

@@ -667,29 +667,93 @@ function seedDB() {
     workflows, dashboards, entities: E,
     counters,
     masterData: {
-      zones: ['المنطقة A', 'المنطقة B', 'المنطقة C', 'المنطقة D', 'المنطقة E', 'المنطقة F', 'القطاع الشمالي', 'القطاع الغربي', 'القطاع الجنوبي', 'المدخل الجنوبي'],
-      categories: ['utility', 'contractorDelay', 'developerDep', 'siteProblem', 'authority', 'design', 'landAccess', 'logistics', 'commercial', 'other'],
-      consultants: ['التحالف الهندسي', 'شركة الاستشارات العامة', 'مكتب التصميم المتخصص', 'مجموعة الاستشارات المتكاملة'],
-      developers: [],
-      statuses: Store.db && Store.db.schemas ? Store.db.schemas.constraint.statuses.map(s => ({ key: s.key, label: s.label })) : [],
-      priorities: ['low', 'medium', 'high', 'critical'],
-      severities: ['low', 'medium', 'high', 'critical'],
-      owners: users.slice(1).map(u => ({ id: u.id, name: u.name, nameEn: u.nameEn })),
-      organizations: [
-        { id: 'org_c1', type: 'contractor', name: 'شركة البناء المتحدة', nameEn: 'United Construction Co.', contactIds: ['p_c1_1'] },
-        { id: 'org_c2', type: 'contractor', name: 'مجموعة الإنشاءات الحديثة', nameEn: 'Modern Constructions Group', contactIds: ['p_c2_1'] },
-        { id: 'org_c3', type: 'contractor', name: 'شركة الأسس العالمية', nameEn: 'Global Foundations Co.', contactIds: ['p_c3_1'] },
-        { id: 'org_c4', type: 'contractor', name: 'شركة دلتا للمقاولات', nameEn: 'Delta Contracting', contactIds: ['p_c4_1'] },
-        { id: 'org_c5', type: 'consultant', name: 'التحالف الهندسي', nameEn: 'Engineering Alliance', contactIds: ['p_c5_1'] },
-        { id: 'org_c6', type: 'contractor', name: 'شركة الرواد للبنية التحتية', nameEn: 'Pioneers Infrastructure', contactIds: ['p_c6_1'] },
-      ],
+      // People Directory
       people: [
-        { id: 'p_c1_1', name: 'أحمد فؤاد', nameEn: 'Ahmed Fouad', position: 'مدير المشروع', company: 'org_c1', email: 'a.fouad@ucc.sa', mobile: '0501234567' },
-        { id: 'p_c2_1', name: 'طارق سليم', nameEn: 'Tariq Salim', position: 'مدير العمليات', company: 'org_c2', email: 't.salim@mcg.sa', mobile: '0552223344' },
-        { id: 'p_c3_1', name: 'ياسر النعيمي', nameEn: 'Yasser Naimi', position: 'مدير الموقع', company: 'org_c3', email: 'y.naimi@gfc.sa', mobile: '0533334455' },
-        { id: 'p_c4_1', name: 'هاني عبدالرحمن', nameEn: 'Hani Abdulrahman', position: 'مدير المشروع', company: 'org_c4', email: 'h.abdulrahman@delta.sa', mobile: '0544445566' },
-        { id: 'p_c5_1', name: 'ريم الدوسري', nameEn: 'Reem Dosari', position: 'مديرة التصميم', company: 'org_c5', email: 'r.dosari@ealliance.sa', mobile: '0566667788' },
-        { id: 'p_c6_1', name: 'سعد المالكي', nameEn: 'Saad Malki', position: 'مدير المشروع', company: 'org_c6', email: 's.malki@pioneers.sa', mobile: '0577778899' },
+        { id: 'p_c1_1', name: 'أحمد فؤاد', nameEn: 'Ahmed Fouad', position: 'مدير المشروع', department: 'المشاريع', discipline: 'الإنشاءات', company: 'org_c1', email: 'a.fouad@ucc.sa', mobile: '0501234567', active: true, archived: false },
+        { id: 'p_c2_1', name: 'طارق سليم', nameEn: 'Tariq Salim', position: 'مدير العمليات', department: 'العمليات', discipline: 'الهندسة', company: 'org_c2', email: 't.salim@mcg.sa', mobile: '0552223344', active: true, archived: false },
+        { id: 'p_c3_1', name: 'ياسر النعيمي', nameEn: 'Yasser Naimi', position: 'مدير الموقع', department: 'الموقع', discipline: 'الإنشاءات', company: 'org_c3', email: 'y.naimi@gfc.sa', mobile: '0533334455', active: true, archived: false },
+        { id: 'p_c4_1', name: 'هاني عبدالرحمن', nameEn: 'Hani Abdulrahman', position: 'مدير المشروع', department: 'المشاريع', discipline: 'الإنشاءات', company: 'org_c4', email: 'h.abdulrahman@delta.sa', mobile: '0544445566', active: true, archived: false },
+        { id: 'p_c5_1', name: 'ريم الدوسري', nameEn: 'Reem Dosari', position: 'مديرة التصميم', department: 'التصميم', discipline: 'الهندسة', company: 'org_c5', email: 'r.dosari@ealliance.sa', mobile: '0566667788', active: true, archived: false },
+        { id: 'p_c6_1', name: 'سعد المالكي', nameEn: 'Saad Malki', position: 'مدير المشروع', department: 'المشاريع', discipline: 'البنية التحتية', company: 'org_c6', email: 's.malki@pioneers.sa', mobile: '0577778899', active: true, archived: false },
+      ],
+
+      // Organizations Directory
+      organizations: [
+        { id: 'org_c1', type: 'contractor', name: 'شركة البناء المتحدة', nameEn: 'United Construction Co.', contactPerson: 'أحمد فؤاد', email: 'info@ucc.sa', mobile: '0501234567', notes: '', active: true, archived: false },
+        { id: 'org_c2', type: 'contractor', name: 'مجموعة الإنشاءات الحديثة', nameEn: 'Modern Constructions Group', contactPerson: 'طارق سليم', email: 'info@mcg.sa', mobile: '0552223344', notes: '', active: true, archived: false },
+        { id: 'org_c3', type: 'contractor', name: 'شركة الأسس العالمية', nameEn: 'Global Foundations Co.', contactPerson: 'ياسر النعيمي', email: 'info@gfc.sa', mobile: '0533334455', notes: '', active: true, archived: false },
+        { id: 'org_c4', type: 'contractor', name: 'شركة دلتا للمقاولات', nameEn: 'Delta Contracting', contactPerson: 'هاني عبدالرحمن', email: 'info@delta.sa', mobile: '0544445566', notes: '', active: true, archived: false },
+        { id: 'org_c5', type: 'consultant', name: 'التحالف الهندسي', nameEn: 'Engineering Alliance', contactPerson: 'ريم الدوسري', email: 'info@ealliance.sa', mobile: '0566667788', notes: '', active: true, archived: false },
+        { id: 'org_c6', type: 'contractor', name: 'شركة الرواد للبنية التحتية', nameEn: 'Pioneers Infrastructure', contactPerson: 'سعد المالكي', email: 'info@pioneers.sa', mobile: '0577778899', notes: '', active: true, archived: false },
+      ],
+
+      // Location Data
+      zones: [
+        { id: 'z1', name: 'المنطقة A', active: true, archived: false },
+        { id: 'z2', name: 'المنطقة B', active: true, archived: false },
+        { id: 'z3', name: 'المنطقة C', active: true, archived: false },
+        { id: 'z4', name: 'المنطقة D', active: true, archived: false },
+        { id: 'z5', name: 'المنطقة E', active: true, archived: false },
+        { id: 'z6', name: 'المنطقة F', active: true, archived: false },
+        { id: 'z7', name: 'القطاع الشمالي', active: true, archived: false },
+        { id: 'z8', name: 'القطاع الغربي', active: true, archived: false },
+        { id: 'z9', name: 'القطاع الجنوبي', active: true, archived: false },
+        { id: 'z10', name: 'المدخل الجنوبي', active: true, archived: false },
+      ],
+
+      streets: [
+        { id: 's1', name: 'شارع الملك عبدالعزيز', zone: 'z1', active: true, archived: false },
+        { id: 's2', name: 'شارع العليا الفرعي', zone: 'z1', active: true, archived: false },
+        { id: 's3', name: 'قناة التصريف الرئيسية', zone: 'z3', active: true, archived: false },
+        { id: 's4', name: 'جسر التقاطع 4', zone: 'z2', active: true, archived: false },
+      ],
+
+      // Classification Data
+      categories: [
+        { id: 'cat_u', key: 'utility', label: { ar: 'تعارض مرافق', en: 'Utility Conflict' }, active: true, archived: false },
+        { id: 'cat_cd', key: 'contractorDelay', label: { ar: 'تأخير مقاول', en: 'Contractor Delay' }, active: true, archived: false },
+        { id: 'cat_dd', key: 'developerDep', label: { ar: 'اعتمادية مطور', en: 'Developer Dependency' }, active: true, archived: false },
+        { id: 'cat_sp', key: 'siteProblem', label: { ar: 'مشكلة موقع', en: 'Site Problem' }, active: true, archived: false },
+        { id: 'cat_au', key: 'authority', label: { ar: 'جهات حكومية', en: 'Authorities' }, active: true, archived: false },
+        { id: 'cat_d', key: 'design', label: { ar: 'تصميم', en: 'Design' }, active: true, archived: false },
+        { id: 'cat_la', key: 'landAccess', label: { ar: 'أراضٍ/حرم طريق', en: 'Land/Right of Way' }, active: true, archived: false },
+        { id: 'cat_l', key: 'logistics', label: { ar: 'لوجستيات', en: 'Logistics' }, active: true, archived: false },
+        { id: 'cat_c', key: 'commercial', label: { ar: 'تجاري', en: 'Commercial' }, active: true, archived: false },
+        { id: 'cat_o', key: 'other', label: { ar: 'أخرى', en: 'Other' }, active: true, archived: false },
+      ],
+
+      subcategories: [
+        { id: 'sub1', name: 'كهرباء', active: true, archived: false },
+        { id: 'sub2', name: 'المياه', active: true, archived: false },
+        { id: 'sub3', name: 'الصرف', active: true, archived: false },
+      ],
+
+      departments: [
+        { id: 'dept1', name: 'المشاريع', active: true, archived: false },
+        { id: 'dept2', name: 'العمليات', active: true, archived: false },
+        { id: 'dept3', name: 'الموقع', active: true, archived: false },
+        { id: 'dept4', name: 'التصميم', active: true, archived: false },
+      ],
+
+      disciplines: [
+        { id: 'disc1', name: 'الإنشاءات', active: true, archived: false },
+        { id: 'disc2', name: 'الهندسة', active: true, archived: false },
+        { id: 'disc3', name: 'البنية التحتية', active: true, archived: false },
+        { id: 'disc4', name: 'الكهروميكانيك', active: true, archived: false },
+      ],
+
+      priorities: [
+        { id: 'p1', label: { ar: 'منخفضة', en: 'Low' }, key: 'low', active: true, archived: false },
+        { id: 'p2', label: { ar: 'متوسطة', en: 'Medium' }, key: 'medium', active: true, archived: false },
+        { id: 'p3', label: { ar: 'عالية', en: 'High' }, key: 'high', active: true, archived: false },
+        { id: 'p4', label: { ar: 'حرجة', en: 'Critical' }, key: 'critical', active: true, archived: false },
+      ],
+
+      severities: [
+        { id: 'sev1', label: { ar: 'منخفضة', en: 'Low' }, key: 'low', active: true, archived: false },
+        { id: 'sev2', label: { ar: 'متوسطة', en: 'Medium' }, key: 'medium', active: true, archived: false },
+        { id: 'sev3', label: { ar: 'عالية', en: 'High' }, key: 'high', active: true, archived: false },
+        { id: 'sev4', label: { ar: 'حرجة', en: 'Critical' }, key: 'critical', active: true, archived: false },
       ],
     },
   };
@@ -1024,33 +1088,92 @@ const Store = {
     return this.db.masterData[category] || [];
   },
 
-  // People & Organization Directory
-  getOrganizations(type) { return this.db.masterData.organizations.filter(o => !type || o.type === type); },
-  getPeople(orgId) { return orgId ? this.db.masterData.people.filter(p => p.company === orgId) : this.db.masterData.people; },
-  getOrganization(id) { return this.db.masterData.organizations.find(o => o.id === id); },
-  getPerson(id) { return this.db.masterData.people.find(p => p.id === id); },
-  addOrganization(org) {
-    org.id = org.id || uid('org');
-    this.db.masterData.organizations.push(org);
-    this.save();
-    return org;
+  // Master Data - Enhanced Queries
+  getMasterList(category, { onlyActive = true, includeArchived = false } = {}) {
+    const items = this.db.masterData[category] || [];
+    return items.filter(item => {
+      if (includeArchived) return true;
+      if (onlyActive) return item.active && !item.archived;
+      return !item.archived;
+    });
   },
-  addPerson(person) {
-    person.id = person.id || uid('p');
-    this.db.masterData.people.push(person);
-    this.save();
-    return person;
-  },
-  searchOrganizations(query, type) {
-    const orgs = this.getOrganizations(type);
-    if (!query) return orgs;
+
+  searchMasterList(category, query, options = {}) {
+    const items = this.getMasterList(category, options);
+    if (!query) return items;
     const q = query.toLowerCase();
-    return orgs.filter(o => o.name.toLowerCase().includes(q) || (o.nameEn && o.nameEn.toLowerCase().includes(q)));
+    return items.filter(item => {
+      const name = (item.name || item.label?.ar || item.label || '').toString().toLowerCase();
+      const nameEn = (item.nameEn || item.label?.en || '').toString().toLowerCase();
+      return name.includes(q) || nameEn.includes(q);
+    });
   },
-  searchPeople(query, orgId) {
-    const people = this.getPeople(orgId);
+
+  addToMasterList(category, item) {
+    if (!this.db.masterData[category]) return false;
+    item.id = item.id || uid(category.slice(0, 3));
+    item.active = item.active !== false;
+    item.archived = item.archived || false;
+    this.db.masterData[category].push(item);
+    this.save();
+    return item;
+  },
+
+  // People & Organization Directory
+  getPeople(orgId, options = {}) {
+    const people = this.getMasterList('people', options);
+    return orgId ? people.filter(p => p.company === orgId) : people;
+  },
+
+  getOrganizations(type, options = {}) {
+    const orgs = this.getMasterList('organizations', options);
+    return type ? orgs.filter(o => o.type === type) : orgs;
+  },
+
+  getPerson(id) { return this.db.masterData.people.find(p => p.id === id); },
+  getOrganization(id) { return this.db.masterData.organizations.find(o => o.id === id); },
+
+  searchPeople(query, orgId, options = {}) {
+    const people = this.getPeople(orgId, options);
     if (!query) return people;
     const q = query.toLowerCase();
-    return people.filter(p => p.name.toLowerCase().includes(q) || p.nameEn.toLowerCase().includes(q) || p.email.toLowerCase().includes(q));
+    return people.filter(p =>
+      p.name.toLowerCase().includes(q) ||
+      p.nameEn.toLowerCase().includes(q) ||
+      (p.email && p.email.toLowerCase().includes(q))
+    );
+  },
+
+  searchOrganizations(query, type, options = {}) {
+    const orgs = this.getOrganizations(type, options);
+    if (!query) return orgs;
+    const q = query.toLowerCase();
+    return orgs.filter(o =>
+      o.name.toLowerCase().includes(q) ||
+      (o.nameEn && o.nameEn.toLowerCase().includes(q))
+    );
+  },
+
+  // Dependent suggestions
+  getSuggestionsFor(field, selectedValue, context = {}) {
+    // If user selects an organization, suggest people from that org
+    if (field === 'assignedTo' && context.organization) {
+      return this.getPeople(context.organization);
+    }
+    // If user selects a zone, suggest streets in that zone
+    if (field === 'street' && context.zone) {
+      return this.getMasterList('streets').filter(s => s.zone === context.zone);
+    }
+    return [];
+  },
+
+  // Get streets for a zone
+  getStreetsInZone(zoneId) {
+    return this.getMasterList('streets').filter(s => s.zone === zoneId);
+  },
+
+  // Get people in a company
+  getPeopleInCompany(companyId) {
+    return this.getPeople(companyId, { onlyActive: true });
   },
 };

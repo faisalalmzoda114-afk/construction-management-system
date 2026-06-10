@@ -221,7 +221,107 @@ const UI = {
     return `<div class="empty"><div class="e-ico">${icon}</div><div>${esc(msg || t('noData'))}</div></div>`;
   },
 
-  /* ---------- searchable combo box ---------- */
+  /* ---------- smart combobox for master data ---------- */
+  smartCombo(id, options, settings = {}) {
+    const {
+      value = '',
+      placeholder = '',
+      displayFn = null,
+      freeText = true,
+      category = null,
+      allowAdd = true
+    } = settings;
+
+    const uid = Math.random().toString(36).slice(2, 8);
+    const cid = `smart_${id}_${uid}`;
+
+    return `<div class="smart-combo" id="${cid}" style="position:relative">
+      <input type="text" class="input smart-combo-input" placeholder="${placeholder}" value="${esc(value)}"
+             data-cid="${cid}" data-category="${category || ''}" autocomplete="off"
+             style="width:100%;padding:8px 12px;border:1px solid var(--border);border-radius:6px;font-size:14px">
+      <div class="smart-combo-dropdown" style="display:none;position:absolute;top:100%;left:0;right:0;background:var(--bg-2);border:1px solid var(--border);border-radius:6px;margin-top:2px;max-height:240px;overflow-y:auto;z-index:1000;box-shadow:0 4px 12px rgba(0,0,0,0.15)">
+        <div class="smart-combo-list" style="max-height:200px;overflow-y:auto"></div>
+        ${freeText && allowAdd ? `<div class="smart-combo-add" style="padding:10px 12px;cursor:pointer;color:var(--accent);font-weight:500;border-top:1px solid var(--border);text-align:center;background:rgba(0,0,0,0.2)">+ ${TX('إضافة', 'Add')}</div>` : ''}
+      </div>
+    </div>`;
+  },
+
+  initSmartCombo(container, id, options, onSelect, settings = {}) {
+    const el = container.querySelector(`[id^="smart_${id}_"]`);
+    if (!el) return;
+
+    const input = el.querySelector('.smart-combo-input');
+    const dropdown = el.querySelector('.smart-combo-dropdown');
+    const listDiv = el.querySelector('.smart-combo-list');
+    const addBtn = el.querySelector('.smart-combo-add');
+    const category = input.getAttribute('data-category');
+
+    const renderOptions = (items) => {
+      listDiv.innerHTML = items.map((opt, idx) => {
+        const text = displayFn ? settings.displayFn(opt) : (opt.name || opt.nameEn || opt.label?.ar || opt.label?.en || opt);
+        const val = opt.id || opt.key || opt;
+        return `<div class="smart-combo-option" data-value="${esc(val)}" style="padding:10px 12px;cursor:pointer;border-bottom:1px solid var(--border);background:${idx % 2 ? 'transparent' : 'rgba(255,255,255,0.02)'}">${esc(text)}</div>`;
+      }).join('');
+
+      el.querySelectorAll('.smart-combo-option').forEach(opt => {
+        opt.addEventListener('click', () => {
+          const val = opt.getAttribute('data-value');
+          const text = opt.textContent;
+          input.value = text;
+          onSelect(val, text);
+          dropdown.style.display = 'none';
+        });
+      });
+    };
+
+    const filterAndShow = () => {
+      const q = input.value.toLowerCase().trim();
+      const filtered = !q ? options : options.filter(opt => {
+        const text = (opt.name || opt.nameEn || opt.label?.ar || opt.label?.en || opt.toString()).toLowerCase();
+        return text.includes(q);
+      });
+
+      if (q && filtered.length === 0 && settings.freeText) {
+        // Show "Add new" option
+        listDiv.innerHTML = `<div style="padding:10px 12px;color:var(--mutedText);text-align:center">${TX('لا نتائج', 'No results')}</div>`;
+        dropdown.style.display = 'block';
+      } else {
+        renderOptions(filtered);
+        dropdown.style.display = filtered.length > 0 || q ? 'block' : 'none';
+      }
+    };
+
+    input.addEventListener('input', filterAndShow);
+    input.addEventListener('focus', () => {
+      dropdown.style.display = 'block';
+      filterAndShow();
+    });
+
+    document.addEventListener('click', (e) => {
+      if (!el.contains(e.target)) dropdown.style.display = 'none';
+    });
+
+    if (addBtn) {
+      addBtn.addEventListener('click', () => {
+        const val = input.value.trim();
+        if (val) {
+          // Add to master data if category specified
+          if (category && Store.db.masterData[category]) {
+            const newItem = { id: uid(category), name: val, active: true, archived: false };
+            Store.addToMasterList(category, newItem);
+            // Add to current options
+            options.push(newItem);
+          }
+          onSelect(val, val);
+          dropdown.style.display = 'none';
+        }
+      });
+    }
+
+    renderOptions(options);
+  },
+
+  /* ---------- searchable combo box (legacy) ---------- */
   searchCombo(id, options, onSelect, { placeholder = '', multi = false, freeText = true, displayFn = null } = {}) {
     const idNum = Math.random().toString(36).slice(2, 9);
     const htmlId = `combo_${id}_${idNum}`;
@@ -229,7 +329,7 @@ const UI = {
     return `<div class="search-combo" id="${htmlId}">
       <input type="text" class="input combo-input" placeholder="${placeholder}" data-combo-search data-combo-id="${htmlId}">
       <div class="combo-results hidden" style="display:none;position:absolute;top:100%;left:0;right:0;background:var(--bg-2);border:1px solid var(--border);border-radius:6px;max-height:200px;overflow-y:auto;z-index:100">
-        ${options.map(opt => `<div class="combo-result" data-value="${esc(opt.id || opt.key || opt)}" title="${esc(displayFn ? displayFn(opt) : (opt.name || opt))}" style="padding:8px 12px;cursor:pointer;border-bottom:1px solid var(--border);hover:background-color:var(--accent,.1)">${esc(displayFn ? displayFn(opt) : (opt.name || opt))}</div>`).join('')}
+        ${options.map(opt => `<div class="combo-result" data-value="${esc(opt.id || opt.key || opt)}" title="${esc(displayFn ? displayFn(opt) : (opt.name || opt))}" style="padding:8px 12px;cursor:pointer;border-bottom:1px solid var(--border)">${esc(displayFn ? displayFn(opt) : (opt.name || opt))}</div>`).join('')}
         ${freeText ? `<div class="combo-add" style="padding:8px 12px;cursor:pointer;color:var(--accent);font-weight:500;border-top:1px solid var(--border)">+ ${t('add')}</div>` : ''}
       </div>
       <div class="combo-selected flex" style="flex-wrap:wrap;gap:6px;margin-top:8px"></div>
@@ -245,7 +345,6 @@ const UI = {
     const selected = comboEl.querySelector('.combo-selected');
     const resultItems = comboEl.querySelectorAll('.combo-result');
     const addBtn = comboEl.querySelector('.combo-add');
-    let allOptions = [...options];
 
     input.addEventListener('input', (e) => {
       const q = e.target.value.toLowerCase();

@@ -148,6 +148,12 @@ function defaultSchemas() {
         { key: 'targetClosure', type: 'date',   label: L('Target Closure', 'الإغلاق المستهدف') },
         { key: 'notes',         type: 'textarea', label: L('Notes', 'ملاحظات') },
         { key: 'tags', type: 'tags', label: L('Tags', 'الوسوم'), system: true },
+        { key: 'reviewer',  type: 'text', label: L('Reviewer', 'المراجع') },
+        { key: 'approver',  type: 'text', label: L('Approver', 'المعتمد') },
+        { key: 'watchers',  type: 'tags', label: L('Watchers', 'المتابعون') },
+        { key: 'supportingParties', type: 'tags', label: L('Supporting Parties', 'جهات مساندة') },
+        { key: 'affectedZone',   type: 'text', label: L('Affected Zone', 'المنطقة المتأثرة') },
+        { key: 'affectedStreet', type: 'text', label: L('Affected Street', 'الشارع المتأثر') },
       ],
       statuses: [
         ST('draft', 'Draft', 'مسودة', '#94a3b8'),

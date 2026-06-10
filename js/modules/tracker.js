@@ -415,29 +415,410 @@ const ModTracker = {
   /* ================= create / edit form ================= */
   form(rec, onDone, preset) {
     const sch = Store.schema('constraint');
+    const cur = Object.assign({}, rec || preset || {});
+    const proj = Store.cur() || {};
+    const F = key => sch.fields.find(f => f.key === key);
+    const lbl = it => LANG === 'ar' ? (it.name || (it.label && it.label.ar)) : (it.nameEn || (it.label && it.label.en) || it.name);
+
+    const people = Store.getMasterList('people');
+    const orgs = Store.getMasterList('organizations');
+    const consultants = orgs.filter(o => o.type === 'consultant');
+    const developers = orgs.filter(o => o.type === 'developer');
+    const clients = orgs.filter(o => o.type === 'client' || o.type === 'owner');
+    const zones = Store.getMasterList('zones');
+    const streets = Store.getMasterList('streets');
+    const subcats = Store.getMasterList('subcategories');
+
+    const dl = (id, items) => `<datalist id="${id}">${items.map(i => `<option value="${esc(lbl(i))}">`).join('')}</datalist>`;
+    const streetOptions = (zoneName, selected) => {
+      const z = zones.find(zz => zz.name === zoneName);
+      const list = z ? streets.filter(s => s.zone === z.id) : streets;
+      return `<option value="">${TX('— اختر —', '— Select —')}</option>` +
+        list.map(s => `<option value="${esc(s.name)}" ${selected === s.name ? 'selected' : ''}>${esc(lbl(s))}</option>`).join('') +
+        `<option value="__add">+ ${TX('إضافة شارع جديد', 'Add new street')}</option>`;
+    };
+
+    const tagPresets = [
+      { ar: 'مرافق', en: 'Utilities' }, { ar: 'أسفلت', en: 'Asphalt' }, { ar: 'تصريف أمطار', en: 'Stormwater' },
+      { ar: 'اتصالات', en: 'Telecom' }, { ar: 'كهرباء', en: 'Electricity' }, { ar: 'إغلاق طريق', en: 'Road Closure' },
+      { ar: 'مطور', en: 'Developer' }, { ar: 'تصريح', en: 'Permit' }, { ar: 'سلامة', en: 'Safety' }, { ar: 'جودة', en: 'Quality' },
+    ];
+    const curTags = cur.tags || [];
+    let draftEvidence = [];
+    const relatedLinks = (preset && preset.links) ? preset.links.slice() : [];
+
     const m = UI.modal(`
       <div class="drawer-h"><h2>${rec ? '✏️ ' + t('edit') : '🚩 ＋ ' + TX('معوق / مشكلة جديدة', 'New Issue / Constraint')} ${rec ? `<span class="mut fs12">${esc(rec.ref)}</span>` : ''}</h2>
         <button class="x-btn" data-close>✕</button></div>
-      <div class="drawer-b">${UI.entityForm('constraint', rec || preset || null)}</div>
-      <div class="drawer-f"><button class="btn primary" id="tk-save">💾 ${t('save')}</button>
-        <button class="btn" data-close>${t('cancel')}</button></div>`, { wide: true });
-    m.el.querySelector('#tk-save').onclick = () => {
+      <div class="drawer-b">
+        ${dl('dl-people', people)}${dl('dl-orgs', orgs)}${dl('dl-consultants', consultants)}${dl('dl-developers', developers)}${dl('dl-clients', clients)}${dl('dl-zones', zones)}${dl('dl-streets', streets)}${dl('dl-subcats', subcats)}
+
+        <div class="panel" style="margin-bottom:14px">
+          <div class="grid g4">
+            <div><div class="fs11 mut">${TX('رقم الملف', 'Issue No.')}</div><div class="fs13 b">${rec ? esc(rec.ref) : TX('سيُنشأ عند الحفظ', 'Generated on save')}</div></div>
+            <div><div class="fs11 mut">${TX('تاريخ الإنشاء', 'Created')}</div><div class="fs13 b">${UI.fmtDate(rec ? rec.createdAt : todayISO())}</div></div>
+            <div><div class="fs11 mut">${TX('بواسطة', 'Created By')}</div><div class="fs13 b">${esc(Store.userName(rec ? rec.createdBy : Store.db.currentUserId))}</div></div>
+            <div><div class="fs11 mut">${TX('المشروع', 'Project')}</div><div class="fs13 b">${esc(proj.code || '')} · ${esc((LANG === 'ar' ? proj.name : (proj.nameEn || proj.name)) || '')}</div></div>
+          </div>
+        </div>
+
+        <div class="section-t">📝 ${TX('التفاصيل الأساسية', 'Core Details')}</div>
+        <div class="form-grid">
+          <div class="full"><label class="fl">${tl(F('title').label)} <span class="req">*</span></label>${UI.fieldInput(F('title'), cur.title)}</div>
+          <div class="full"><label class="fl">${tl(F('description').label)}</label>${UI.fieldInput(F('description'), cur.description)}
+            <div class="flexw mt8" style="gap:6px">
+              <button type="button" class="btn xs" id="ai-title">✨ ${TX('اقتراح عنوان', 'Suggest Title')}</button>
+              <button type="button" class="btn xs" id="ai-summary">✨ ${TX('توليد ملخص', 'Generate Summary')}</button>
+              <button type="button" class="btn xs" id="ai-resp">✨ ${TX('اقتراح الجهة المسؤولة', 'Suggest Responsible Party')}</button>
+              <button type="button" class="btn xs" id="ai-cat">✨ ${TX('اقتراح التصنيف', 'Suggest Category')}</button>
+              <button type="button" class="btn xs" id="ai-pri">✨ ${TX('اقتراح الأولوية', 'Suggest Priority')}</button>
+              <button type="button" class="btn xs" id="ai-next">✨ ${TX('اقتراح الإجراء التالي', 'Suggest Next Action')}</button>
+            </div>
+            <div class="fs11 mut mt8" id="ai-next-out"></div>
+          </div>
+          <div><label class="fl">${TX('التصنيف', 'Category')}</label>
+            <select class="input" data-fk="category" id="cr-cat"><option value="">—</option>${sch.categories.map(c => `<option value="${c.key}" ${cur.category === c.key ? 'selected' : ''}>${tl(c.label)}</option>`).join('')}</select></div>
+          <div><label class="fl">${tl(F('subcategory').label)}</label><input class="input" data-fk="subcategory" list="dl-subcats" value="${esc(cur.subcategory || '')}"></div>
+          <div><label class="fl">${tl(F('priority').label)}</label>${UI.fieldInput(F('priority'), cur.priority)}</div>
+          <div><label class="fl">${tl(F('severity').label)}</label>${UI.fieldInput(F('severity'), cur.severity)}</div>
+          <div><label class="fl">${tl(F('dueDate').label)}</label>${UI.fieldInput(F('dueDate'), cur.dueDate || dOff(14))}</div>
+          <div><label class="fl">${tl(F('targetClosure').label)}</label>${UI.fieldInput(F('targetClosure'), cur.targetClosure)}</div>
+          ${rec ? `<div><label class="fl">${t('status')}</label><select class="input" data-fk="status">${sch.statuses.map(s => `<option value="${s.key}" ${rec.status === s.key ? 'selected' : ''}>${tl(s.label)}</option>`).join('')}</select></div>`
+            : `<input type="hidden" data-fk="status" value="draft">`}
+          <div><label class="fl">${tl(F('extRef').label)}</label>${UI.fieldInput(F('extRef'), cur.extRef)}</div>
+        </div>
+
+        <div class="section-t">📍 ${TX('الموقع الذكي', 'Location Intelligence')}</div>
+        <div class="form-grid">
+          <div><label class="fl">${tl(F('zone').label)}</label><select class="input" data-fk="zone" id="cr-zone">
+            <option value="">${TX('— اختر —', '— Select —')}</option>${zones.map(z => `<option value="${esc(z.name)}" ${cur.zone === z.name ? 'selected' : ''}>${esc(lbl(z))}</option>`).join('')}
+            <option value="__add">+ ${TX('إضافة منطقة جديدة', 'Add new zone')}</option></select></div>
+          <div><label class="fl">${tl(F('street').label)}</label><select class="input" data-fk="street" id="cr-street">${streetOptions(cur.zone, cur.street)}</select></div>
+          <div><label class="fl">${tl(F('gps').label)}</label>${UI.fieldInput(F('gps'), cur.gps)}</div>
+        </div>
+
+        <div class="section-t">👥 ${TX('مصفوفة المسؤولية', 'Responsibility Matrix')}</div>
+        <div class="form-grid">
+          <div><label class="fl">${tl(F('responsibleParty').label)} <span class="req">*</span></label>${UI.fieldInput(F('responsibleParty'), cur.responsibleParty)}</div>
+          <div><label class="fl">${tl(F('currentOwner').label)} <span class="req">*</span></label>${UI.fieldInput(F('currentOwner'), cur.currentOwner || Store.db.currentUserId)}</div>
+          <div><label class="fl">${tl(F('assignedTo').label)}</label>${UI.fieldInput(F('assignedTo'), cur.assignedTo)}</div>
+          <div><label class="fl">${tl(F('raisedBy').label)}</label>${UI.fieldInput(F('raisedBy'), cur.raisedBy || Store.db.currentUserId)}</div>
+          <div><label class="fl">${tl(F('reviewer').label)}</label><input class="input" data-fk="reviewer" list="dl-people" value="${esc(cur.reviewer || '')}"></div>
+          <div><label class="fl">${tl(F('approver').label)}</label><input class="input" data-fk="approver" list="dl-people" value="${esc(cur.approver || '')}"></div>
+          <div><label class="fl">${tl(F('watchers').label)}</label><input class="input" data-fk="watchers" list="dl-people" placeholder="${TX('افصل بفاصلة', 'comma separated')}" value="${esc((cur.watchers || []).join(', '))}"></div>
+          <div><label class="fl">${tl(F('supportingParties').label)}</label><input class="input" data-fk="supportingParties" list="dl-orgs" placeholder="${TX('افصل بفاصلة', 'comma separated')}" value="${esc((cur.supportingParties || []).join(', '))}"></div>
+          <div><label class="fl">${tl(F('sentTo').label)}</label>${UI.fieldInput(F('sentTo'), cur.sentTo)}</div>
+        </div>
+
+        <div class="section-t">⚠️ ${TX('قسم التأثير', 'Impact Section')}</div>
+        <div class="form-grid">
+          <div><label class="fl">${tl(F('contractor').label)}</label>${UI.fieldInput(F('contractor'), cur.contractor)}</div>
+          <div><label class="fl">${tl(F('consultant').label)}</label><input class="input" data-fk="consultant" list="dl-consultants" value="${esc(cur.consultant || '')}"></div>
+          <div><label class="fl">${tl(F('developer').label)}</label><input class="input" data-fk="developer" list="dl-developers" value="${esc(cur.developer || '')}"></div>
+          <div><label class="fl">${tl(F('clientParty').label)}</label><input class="input" data-fk="clientParty" list="dl-clients" value="${esc(cur.clientParty || '')}"></div>
+          <div><label class="fl">${tl(F('impactedActivity').label)}</label>${UI.fieldInput(F('impactedActivity'), cur.impactedActivity)}</div>
+          <div><label class="fl">${tl(F('impactedMilestone').label)}</label>${UI.fieldInput(F('impactedMilestone'), cur.impactedMilestone)}</div>
+          <div><label class="fl">${tl(F('impactedWorkfront').label)}</label>${UI.fieldInput(F('impactedWorkfront'), cur.impactedWorkfront)}</div>
+          <div><label class="fl">${tl(F('affectedZone').label)}</label><input class="input" data-fk="affectedZone" list="dl-zones" value="${esc(cur.affectedZone || '')}"></div>
+          <div><label class="fl">${tl(F('affectedStreet').label)}</label><input class="input" data-fk="affectedStreet" list="dl-streets" value="${esc(cur.affectedStreet || '')}"></div>
+        </div>
+
+        <div class="section-t">📎 ${TX('الأدلة والمرفقات', 'Evidence & Attachments')}</div>
+        <div class="form-grid">
+          <div class="full">
+            <input type="file" class="input" id="cr-files" multiple accept="image/*,video/*,.pdf,.doc,.docx,.xls,.xlsx,.dwg">
+            <div class="fs11 mut mt8">${TX('معاينة فورية للصور قبل الحفظ', 'Instant preview for images before saving')}</div>
+            <div id="cr-ev-preview" class="flexw mt8" style="gap:8px"></div>
+          </div>
+        </div>
+
+        ${!rec ? `
+        <div class="section-t">📨 ${TX('المتابعة الأولية', 'Initial Follow-up')}</div>
+        <div class="form-grid">
+          <div><label class="fl">${TX('تاريخ المتابعة', 'Follow-up Date')}</label><input type="date" class="input" id="cr-fu-date" value="${todayISO()}"></div>
+          <div><label class="fl">${TX('أُرسل إلى', 'Sent To')}</label><input class="input" id="cr-fu-sentto" list="dl-people"></div>
+          <div class="full"><label class="fl">${TX('ملاحظات المتابعة', 'Follow-up Notes')}</label><textarea class="input" id="cr-fu-notes" style="height:60px"></textarea></div>
+        </div>
+
+        <div class="section-t">💬 ${TX('الرد الأولي (إن وجد)', 'Initial Response (if available)')}</div>
+        <div class="form-grid">
+          <div><label class="fl">${TX('من', 'From')}</label><input class="input" id="cr-rs-from"></div>
+          <div><label class="fl">${TX('التقييم', 'Evaluation')}</label><select class="input" id="cr-rs-acc">
+            <option value="pending">${TRK.respStates.pending.label()}</option>
+            <option value="accepted">${TRK.respStates.accepted.label()}</option>
+            <option value="rejected">${TRK.respStates.rejected.label()}</option>
+            <option value="moreInfo">${TRK.respStates.moreInfo.label()}</option></select></div>
+          <div class="full"><label class="fl">${TX('ملخص الرد', 'Response Summary')}</label><input class="input" id="cr-rs-sum"></div>
+        </div>
+
+        <div class="section-t">🔗 ${TX('سجلات مرتبطة', 'Related Records')}</div>
+        <div class="form-grid">
+          <div><label class="fl">${TX('النوع', 'Type')}</label><select class="input" id="cr-rel-type">
+            <option value="observation">${TX('ملاحظة ميدانية', 'Site Observation')}</option>
+            <option value="meeting">${TX('اجتماع', 'Meeting')}</option>
+            <option value="correspondence">${TX('مراسلة', 'Correspondence')}</option>
+            <option value="risk">${TX('خطر', 'Risk')}</option>
+            <option value="action">${TX('إجراء', 'Action')}</option>
+            <option value="contractor">${TX('مقاول', 'Contractor')}</option></select></div>
+          <div><label class="fl">${TX('المرجع', 'Reference')}</label><input class="input" id="cr-rel-ref" placeholder="${TX('رقم المرجع أو الاسم', 'Ref ID or name')}"></div>
+          <div style="display:flex;align-items:flex-end"><button type="button" class="btn sm" id="cr-rel-add">＋ ${t('add')}</button></div>
+          <div class="full flexw" id="cr-rel-list" style="gap:6px"></div>
+        </div>` : ''}
+
+        <div class="section-t">🏷️ ${TX('الوسوم الذكية', 'Smart Tags')}</div>
+        <div class="flexw" id="cr-tag-chips" style="gap:6px;margin-bottom:8px">
+          ${tagPresets.map(tg => `<span class="chip lg" data-tag="${esc(tg.ar)}|${esc(tg.en)}" style="cursor:pointer">${esc(LANG === 'ar' ? tg.ar : tg.en)}</span>`).join('')}
+        </div>
+        <input class="input" data-fk="tags" id="cr-tags-input" value="${esc(curTags.join(', '))}" placeholder="${TX('وسوم مخصصة، افصل بفاصلة', 'custom tags, comma separated')}">
+
+        <div class="section-t">👁️ ${TX('معاينة الملف', 'Issue Preview')}</div>
+        <div class="panel" id="cr-preview" style="margin-bottom:10px">
+          <div class="fs12 mut">${TX('انقر "معاينة" لعرض ملخص الملف قبل الحفظ', 'Click "Preview" to see a summary before saving')}</div>
+        </div>
+        <button type="button" class="btn sm" id="cr-preview-btn">👁️ ${TX('معاينة', 'Preview')}</button>
+      </div>
+      <div class="drawer-f flexw" style="gap:8px">
+        ${!rec ? `<button class="btn" id="cr-draft">📝 ${TX('حفظ كمسودة', 'Save Draft')}</button>` : ''}
+        <button class="btn primary" id="cr-save">💾 ${rec ? t('save') : TX('حفظ وتقديم', 'Save & Submit')}</button>
+        ${!rec ? `<button class="btn" id="cr-send">📤 ${TX('حفظ وإرسال', 'Save & Send')}</button>` : ''}
+        ${!rec ? `<button class="btn" id="cr-another">➕ ${TX('حفظ وإنشاء آخر', 'Save & Create Another')}</button>` : ''}
+        <button class="btn" data-close>${t('cancel')}</button>
+      </div>`, { wide: true });
+
+    /* ---- location cascading ---- */
+    const zoneSel = m.el.querySelector('#cr-zone');
+    const streetSel = m.el.querySelector('#cr-street');
+    zoneSel.onchange = () => {
+      if (zoneSel.value === '__add') {
+        const nm = prompt(TX('أدخل اسم المنطقة الجديدة', 'Enter new zone name'));
+        if (nm) {
+          Store.addToMasterList('zones', { name: nm, nameEn: nm });
+          zones.push({ name: nm, nameEn: nm });
+          const opt = document.createElement('option'); opt.value = nm; opt.textContent = nm; opt.selected = true;
+          zoneSel.insertBefore(opt, zoneSel.lastElementChild);
+        } else zoneSel.value = '';
+      }
+      streetSel.innerHTML = streetOptions(zoneSel.value, '');
+    };
+    streetSel.onchange = () => {
+      if (streetSel.value === '__add') {
+        const nm = prompt(TX('أدخل اسم الشارع الجديد', 'Enter new street name'));
+        if (nm) {
+          const z = zones.find(zz => zz.name === zoneSel.value);
+          Store.addToMasterList('streets', { name: nm, nameEn: nm, zone: z ? z.id : null });
+          streets.push({ name: nm, nameEn: nm, zone: z ? z.id : null });
+          const opt = document.createElement('option'); opt.value = nm; opt.textContent = nm; opt.selected = true;
+          streetSel.insertBefore(opt, streetSel.lastElementChild);
+        } else streetSel.value = '';
+      }
+    };
+
+    /* ---- evidence preview ---- */
+    const filesInput = m.el.querySelector('#cr-files');
+    const evPreview = m.el.querySelector('#cr-ev-preview');
+    const renderEvPreview = () => {
+      evPreview.innerHTML = draftEvidence.map((e, i) => `<div class="panel" style="padding:6px;text-align:center;width:90px">
+        ${e.dataUrl ? `<img src="${e.dataUrl}" style="width:100%;height:60px;object-fit:cover;border-radius:6px">` : `<div style="font-size:24px">${e.etype === 'video' ? '🎬' : '📄'}</div>`}
+        <div class="fs11" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(e.name)}</div>
+        <button type="button" class="btn xs" data-rmev="${i}" style="margin-top:4px">✕</button>
+      </div>`).join('');
+      evPreview.querySelectorAll('[data-rmev]').forEach(b => b.onclick = () => { draftEvidence.splice(+b.dataset.rmev, 1); renderEvPreview(); });
+    };
+    filesInput.onchange = () => {
+      const files = Array.from(filesInput.files || []);
+      files.forEach(fl => {
+        const etype = fl.type.startsWith('image/') ? 'photo' : fl.type.startsWith('video/') ? 'video' : 'document';
+        if (fl.type.startsWith('image/') && fl.size < 4000000) {
+          const rd = new FileReader();
+          rd.onload = () => {
+            const img = new Image();
+            img.onload = () => {
+              const cv = document.createElement('canvas');
+              const sc = Math.min(1, 240 / Math.max(img.width, img.height));
+              cv.width = Math.round(img.width * sc); cv.height = Math.round(img.height * sc);
+              cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height);
+              draftEvidence.push({ id: uid('ev'), name: fl.name, etype, stage: 'identification', desc: '', dataUrl: cv.toDataURL('image/jpeg', 0.72), fullDataUrl: rd.result, size: fl.size });
+              renderEvPreview();
+            };
+            img.src = rd.result;
+          };
+          rd.readAsDataURL(fl);
+        } else {
+          draftEvidence.push({ id: uid('ev'), name: fl.name, etype, stage: 'identification', desc: '', size: fl.size });
+          renderEvPreview();
+        }
+      });
+      filesInput.value = '';
+    };
+
+    /* ---- related records ---- */
+    const relList = m.el.querySelector('#cr-rel-list');
+    if (relList) {
+      const renderRel = () => {
+        relList.innerHTML = relatedLinks.map((l, i) => `<span class="tag">${esc(UI.optLabel(l.type))}: ${esc(l.id)} <span data-rmrel="${i}" style="cursor:pointer">✕</span></span>`).join(' ');
+        relList.querySelectorAll('[data-rmrel]').forEach(b => b.onclick = () => { relatedLinks.splice(+b.dataset.rmrel, 1); renderRel(); });
+      };
+      m.el.querySelector('#cr-rel-add').onclick = () => {
+        const type = m.el.querySelector('#cr-rel-type').value;
+        const ref = m.el.querySelector('#cr-rel-ref').value.trim();
+        if (!ref) return;
+        relatedLinks.push({ type, id: ref });
+        m.el.querySelector('#cr-rel-ref').value = '';
+        renderRel();
+      };
+      renderRel();
+    }
+
+    /* ---- smart tags ---- */
+    m.el.querySelectorAll('[data-tag]').forEach(chip => {
+      const [ar, en] = chip.dataset.tag.split('|');
+      const val = LANG === 'ar' ? ar : en;
+      const inp = m.el.querySelector('#cr-tags-input');
+      if (curTags.includes(val)) chip.style.background = 'var(--accent)';
+      chip.onclick = () => {
+        let arr = inp.value.split(',').map(s => s.trim()).filter(Boolean);
+        if (arr.includes(val)) { arr = arr.filter(x => x !== val); chip.style.background = ''; }
+        else { arr.push(val); chip.style.background = 'var(--accent)'; }
+        inp.value = arr.join(', ');
+      };
+    });
+
+    /* ---- AI assistance (heuristic suggestions) ---- */
+    const descEl = m.el.querySelector('[data-fk="description"]');
+    const titleEl = m.el.querySelector('[data-fk="title"]');
+    const catEl = m.el.querySelector('#cr-cat');
+    const priEl = m.el.querySelector('[data-fk="priority"]');
+    const respEl = m.el.querySelector('[data-fk="responsibleParty"]');
+    const notesEl = m.el.querySelector('[data-fk="notes"]');
+    const desc = () => (descEl ? descEl.value : '').trim();
+
+    m.el.querySelector('#ai-title').onclick = () => {
+      const d = desc(); if (!d) { UI.toast(TX('أدخل الوصف أولاً', 'Enter a description first'), 'err'); return; }
+      const words = d.split(/\s+/).slice(0, 8).join(' ');
+      const zoneTxt = zoneSel.value ? ` — ${zoneSel.value}` : '';
+      titleEl.value = words + (d.split(/\s+/).length > 8 ? '…' : '') + zoneTxt;
+    };
+    m.el.querySelector('#ai-summary').onclick = () => {
+      const d = desc(); if (!d) { UI.toast(TX('أدخل الوصف أولاً', 'Enter a description first'), 'err'); return; }
+      if (notesEl) notesEl.value = d.length > 160 ? d.slice(0, 160) + '…' : d;
+      UI.toast(TX('تم إدراج الملخص في الملاحظات', 'Summary inserted into notes'));
+    };
+    m.el.querySelector('#ai-resp').onclick = () => {
+      const d = desc();
+      let v = 'internal';
+      if (/مقاول|contractor/i.test(d)) v = 'contractor';
+      else if (/استشاري|consultant/i.test(d)) v = 'consultant';
+      else if (/مطور|developer/i.test(d)) v = 'developer';
+      else if (/أمانة|بلدية|حكوم|authority/i.test(d)) v = 'authority';
+      else if (/عميل|client/i.test(d)) v = 'client';
+      respEl.value = v;
+    };
+    m.el.querySelector('#ai-cat').onclick = () => {
+      const d = desc();
+      const map = [
+        [/كهرب|electric/i, 'utility'], [/مياه|صرف|water|drain/i, 'utility'],
+        [/تأخر.*مقاول|مقاول.*تأخر|contractor delay/i, 'contractorDelay'],
+        [/مطور|developer/i, 'developerDep'], [/تصريح|أمانة|بلدية|permit|authority/i, 'authority'],
+        [/تصميم|design/i, 'design'], [/أرض|حرم|land|right of way/i, 'landAccess'],
+        [/نقل|لوجست|logistic/i, 'logistics'], [/مالي|تكلفة|commercial/i, 'commercial'],
+      ];
+      let key = 'other';
+      for (const [re, k] of map) if (re.test(d)) { key = k; break; }
+      catEl.value = key;
+    };
+    m.el.querySelector('#ai-pri').onclick = () => {
+      const d = desc();
+      priEl.value = /حرج|عاجل|خطير|critical|urgent|severe/i.test(d) ? 'high' : 'medium';
+    };
+    m.el.querySelector('#ai-next').onclick = () => {
+      const d = desc();
+      const out = m.el.querySelector('#ai-next-out');
+      let txt;
+      if (/حرج|عاجل|critical|urgent/i.test(d)) txt = TX('يوصى بالتصعيد الفوري وإشعار الإدارة التنفيذية.', 'Recommend immediate escalation and notify executive management.');
+      else if (/مقاول|contractor/i.test(d)) txt = TX('يوصى بإرسال متابعة رسمية للمقاول مع تحديد مهلة للرد.', 'Recommend sending an official follow-up to the contractor with a response deadline.');
+      else txt = TX('يوصى بمتابعة دورية مع الجهة المسؤولة حتى الحل.', 'Recommend routine follow-up with the responsible party until resolved.');
+      out.textContent = '🎯 ' + txt;
+    };
+
+    /* ---- preview ---- */
+    m.el.querySelector('#cr-preview-btn').onclick = () => {
+      const data = {};
+      m.el.querySelectorAll('[data-fk]').forEach(inp => { data[inp.getAttribute('data-fk')] = inp.value; });
+      const impactParts = [
+        data.contractor ? (Store.contractor(data.contractor) || {}).name : '',
+        data.consultant, data.developer, data.impactedActivity, data.impactedMilestone,
+      ].filter(Boolean).join(' · ') || '—';
+      m.el.querySelector('#cr-preview').innerHTML = `
+        <div class="grid g2">
+          <div class="dt-row"><div class="dt-k">${TX('العنوان', 'Title')}</div><div class="dt-v">${esc(data.title || '—')}</div></div>
+          <div class="dt-row"><div class="dt-k">${TX('الأولوية', 'Priority')}</div><div class="dt-v">${UI.prioChip(data.priority || 'medium')}</div></div>
+          <div class="dt-row"><div class="dt-k">${TX('الجهة المسؤولة', 'Responsible Party')}</div><div class="dt-v">${esc(UI.optLabel(data.responsibleParty) || '—')}</div></div>
+          <div class="dt-row"><div class="dt-k">${TX('المنطقة', 'Zone')}</div><div class="dt-v">${esc(data.zone || '—')}</div></div>
+          <div class="dt-row"><div class="dt-k">${TX('الشارع', 'Street')}</div><div class="dt-v">${esc(data.street || '—')}</div></div>
+          <div class="dt-row"><div class="dt-k">${TX('الاستحقاق', 'Due Date')}</div><div class="dt-v">${data.dueDate ? UI.fmtDate(data.dueDate) : '—'}</div></div>
+          <div class="dt-row full" style="grid-column:1/-1"><div class="dt-k">${TX('التأثير', 'Impact')}</div><div class="dt-v">${esc(impactParts)}</div></div>
+        </div>`;
+    };
+
+    /* ---- save handlers ---- */
+    const doSave = (statusOverride, opts = {}) => {
+      const statusInp = m.el.querySelector('[data-fk="status"]');
+      if (statusInp && statusOverride) statusInp.value = statusOverride;
       const data = UI.collectForm(m.el, 'constraint');
       if (!data) return;
+
       if (rec) {
         if (data.dueDate !== rec.dueDate) Store.logTL('constraint', rec.id, 'due', { oldVal: rec.dueDate, newVal: data.dueDate });
         if (data.currentOwner !== rec.currentOwner) Store.logTL('constraint', rec.id, 'owner', { oldVal: Store.userName(rec.currentOwner), newVal: Store.userName(data.currentOwner) });
         Store.update('constraint', rec.id, data);
+        if (draftEvidence.length) {
+          rec.evidence = rec.evidence || [];
+          rec.evidence.push(...draftEvidence);
+          Store.logTL('constraint', rec.id, 'attachment', { attachments: draftEvidence.map(e => e.name) });
+        }
         Store.logTL('constraint', rec.id, 'edit', { comment: TX('تم تحديث بيانات ملف المعوق.', 'Case details updated.') });
-      } else {
-        const created = Store.create('constraint', Object.assign({
-          followups: [], responses: [], evidence: [], links: (preset && preset.links) || [], closures: [], timeline: [],
-        }, data, preset && preset.sourceType ? { sourceType: preset.sourceType, sourceId: preset.sourceId } : {}));
-        Store.logTL('constraint', created.id, 'created', { comment: TX('تم إنشاء ملف المعوق.', 'Case file created.') });
+        Store.save();
+        m.close(); UI.toast(t('saved'));
+        if (onDone) onDone();
+        return;
       }
+
+      const created = Store.create('constraint', Object.assign({
+        followups: [], responses: [], evidence: draftEvidence.slice(), links: relatedLinks, closures: [], timeline: [],
+      }, data, preset && preset.sourceType ? { sourceType: preset.sourceType, sourceId: preset.sourceId } : {}));
+      Store.logTL('constraint', created.id, 'created', { comment: TX('تم إنشاء ملف المعوق.', 'Case file created.') });
+      if (draftEvidence.length) Store.logTL('constraint', created.id, 'attachment', { attachments: draftEvidence.map(e => e.name) });
+
+      if (opts.sendInitials) {
+        const fuDate = m.el.querySelector('#cr-fu-date').value;
+        const fuTo = m.el.querySelector('#cr-fu-sentto').value.trim();
+        const fuNotes = m.el.querySelector('#cr-fu-notes').value.trim();
+        const rsFrom = m.el.querySelector('#cr-rs-from').value.trim();
+        const rsAcc = m.el.querySelector('#cr-rs-acc').value;
+        const rsSum = m.el.querySelector('#cr-rs-sum').value.trim();
+        if (fuTo || fuNotes) {
+          created.followups.push({ id: uid('fu'), date: fuDate, method: 'email', fuType: 'reminder', sentToParty: fuTo, by: Store.db.currentUserId, comment: fuNotes, requiredAction: '', nextDate: '', attachment: '', statusAfter: '' });
+          Store.logTL('constraint', created.id, 'followup', { comment: fuNotes, attachments: [] });
+        }
+        if (rsSum) {
+          created.responses.push({ id: uid('rs'), date: todayISO(), from: rsFrom, company: fuTo, accepted: rsAcc, summary: rsSum, fullText: '' });
+          Store.logTL('constraint', created.id, 'response', { comment: rsSum });
+        }
+      }
+      Store.save();
       m.close(); UI.toast(t('saved'));
+      if (opts.createAnother) { this.form(null, onDone, preset); return; }
       if (onDone) onDone();
     };
+
+    if (!rec) {
+      m.el.querySelector('#cr-draft').onclick = () => doSave('draft');
+      m.el.querySelector('#cr-send').onclick = () => doSave('sent', { sendInitials: true });
+      m.el.querySelector('#cr-another').onclick = () => doSave('submitted', { sendInitials: true, createAnother: true });
+      m.el.querySelector('#cr-save').onclick = () => doSave('submitted', { sendInitials: true });
+    } else {
+      m.el.querySelector('#cr-save').onclick = () => doSave(null);
+    }
   },
 
   /* convert from observation / meeting / correspondence */
@@ -739,8 +1120,8 @@ const ModTracker = {
   },
 
   editForm(r, onDone) {
-    const zones = Store.getMasterData('zones');
-    const consultants = Store.getMasterData('consultants');
+    const zones = Store.getMasterList('zones');
+    const consultants = Store.getOrganizations('consultant');
     const users = Store.db.users;
     const contractors = Store.db.contractors;
 
@@ -773,12 +1154,12 @@ const ModTracker = {
 
         <div><label class="fl">${TX('المنطقة / القطاع', 'Zone / Area')}</label><select class="input" id="ed-zone">
           <option value="">${TX('— اختر —', '— Select —')}</option>
-          ${zones.map(z => `<option value="${esc(z)}" ${r.zone === z ? 'selected' : ''}>${esc(z)}</option>`).join('')}
+          ${zones.map(z => `<option value="${esc(z.name)}" ${r.zone === z.name ? 'selected' : ''}>${esc(LANG === 'ar' ? z.name : (z.nameEn || z.name))}</option>`).join('')}
           <option value="__add">+ ${TX('إضافة منطقة جديدة', 'Add new zone')}</option></select></div>
 
         <div><label class="fl">${TX('الاستشاري', 'Consultant')}</label><select class="input" id="ed-cons">
           <option value="">${TX('— اختر —', '— Select —')}</option>
-          ${consultants.map(c => `<option value="${esc(c)}" ${r.consultant === c ? 'selected' : ''}>${esc(c)}</option>`).join('')}
+          ${consultants.map(c => `<option value="${esc(c.name)}" ${r.consultant === c.name ? 'selected' : ''}>${esc(LANG === 'ar' ? c.name : (c.nameEn || c.name))}</option>`).join('')}
           <option value="__add">+ ${TX('إضافة استشاري جديد', 'Add new consultant')}</option></select></div>
 
         <div><label class="fl">${TX('الأولوية', 'Priority')}</label><select class="input" id="ed-pri" value="${r.priority || 'medium'}">
@@ -804,7 +1185,7 @@ const ModTracker = {
       if (zoneEl.value === '__add') {
         const newZone = prompt(TX('أدخل اسم المنطقة الجديدة', 'Enter new zone name'));
         if (newZone) {
-          Store.addMasterDataItem('zones', newZone);
+          Store.addToMasterList('zones', { name: newZone, nameEn: newZone });
           zoneEl.innerHTML += `<option value="${esc(newZone)}" selected>${esc(newZone)}</option>`;
           zoneEl.value = newZone;
         } else {
@@ -816,7 +1197,7 @@ const ModTracker = {
       if (consEl.value === '__add') {
         const newCons = prompt(TX('أدخل اسم الاستشاري الجديد', 'Enter new consultant name'));
         if (newCons) {
-          Store.addMasterDataItem('consultants', newCons);
+          Store.addToMasterList('organizations', { type: 'consultant', name: newCons, nameEn: newCons });
           consEl.innerHTML += `<option value="${esc(newCons)}" selected>${esc(newCons)}</option>`;
           consEl.value = newCons;
         } else {

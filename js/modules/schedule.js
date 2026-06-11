@@ -94,40 +94,65 @@ const SchParse = {
     return acts;
   },
 
-  xer(text) {
-    const lines = text.split(/\r?\n/);
-    let fields = [], inTask = false;
-    const acts = [];
-    for (const line of lines) {
-      if (line.startsWith('%T')) { inTask = line.split('\t')[1] === 'TASK'; continue; }
-      if (!inTask) continue;
-      if (line.startsWith('%F')) { fields = line.split('\t').slice(1); continue; }
-      if (line.startsWith('%R')) {
-        const vals = line.split('\t').slice(1);
-        const row = {};
+  // split a full .xer into its named tables → { TABLE: [rows…] }
+  xerTables(text) {
+    const tables = {}; let cur = null, fields = [];
+    text.split(/\r?\n/).forEach(line => {
+      const cells = line.split('\t');
+      if (cells[0] === '%T') { cur = cells[1]; fields = []; tables[cur] = []; }
+      else if (cells[0] === '%F') { fields = cells.slice(1); }
+      else if (cells[0] === '%R' && cur) {
+        const vals = cells.slice(1), row = {};
         fields.forEach((f, i) => row[f] = vals[i]);
-        const hrToDay = h => h ? Math.round((parseFloat(h) / 8) * 10) / 10 : 0;
-        const float = row.total_float_hr_cnt !== undefined ? hrToDay(row.total_float_hr_cnt) : null;
-        acts.push({
-          activityId: row.task_code || '',
-          name: row.task_name || '',
-          wbs: row.wbs_id || '',
-          start: schParseDate(row.act_start_date || row.early_start_date || row.target_start_date),
-          finish: schParseDate(row.act_end_date || row.early_end_date || row.target_end_date),
-          baselineStart: schParseDate(row.target_start_date),
-          baselineFinish: schParseDate(row.target_end_date),
-          actualStart: schParseDate(row.act_start_date),
-          actualFinish: schParseDate(row.act_end_date),
-          pctComplete: row.phys_complete_pct ? parseFloat(row.phys_complete_pct) : (row.status_code === 'TK_Complete' ? 100 : 0),
-          duration: hrToDay(row.target_drtn_hr_cnt),
-          float,
-          critical: float !== null && float <= 0,
-          milestone: (row.task_type || '').includes('Mile'),
-          predecessors: [], successors: [],
-        });
+        tables[cur].push(row);
       }
-    }
-    return acts;
+    });
+    return tables;
+  },
+
+  xer(text) {
+    const T = this.xerTables(text);
+    const hrToDay = h => (h === undefined || h === '' || h === null) ? 0 : Math.round((parseFloat(h) / 8) * 10) / 10;
+    const wbs = (T.PROJWBS || []).map(w => ({ xid: w.wbs_id, parentId: w.parent_wbs_id || '', name: w.wbs_name || '', code: w.wbs_short_name || '' }));
+    const wbsName = {}; wbs.forEach(w => wbsName[w.xid] = w.name);
+    const calendars = (T.CALENDAR || []).map(c => ({ xid: c.clndr_id, name: c.clndr_name || '' }));
+    const resources = (T.RSRC || []).map(r => ({ xid: r.rsrc_id, name: r.rsrc_name || '', code: r.rsrc_short_name || '' }));
+    const tasks = T.TASK || [];
+    const idToCode = {}; tasks.forEach(t => idToCode[t.task_id] = t.task_code);
+    let hasBaseline = false;
+    const acts = tasks.map(row => {
+      const float = (row.total_float_hr_cnt !== undefined && row.total_float_hr_cnt !== '') ? hrToDay(row.total_float_hr_cnt) : null;
+      const bls = schParseDate(row.target_start_date), blf = schParseDate(row.target_end_date);
+      if (bls || blf) hasBaseline = true;
+      return {
+        xid: row.task_id,
+        activityId: row.task_code || '',
+        name: row.task_name || '',
+        wbs: wbsName[row.wbs_id] || row.wbs_id || '',
+        wbsId: row.wbs_id || '',
+        start: schParseDate(row.act_start_date || row.early_start_date || row.target_start_date),
+        finish: schParseDate(row.act_end_date || row.early_end_date || row.target_end_date),
+        baselineStart: bls, baselineFinish: blf,
+        actualStart: schParseDate(row.act_start_date),
+        actualFinish: schParseDate(row.act_end_date),
+        pctComplete: row.phys_complete_pct ? parseFloat(row.phys_complete_pct) : (row.status_code === 'TK_Complete' ? 100 : 0),
+        duration: hrToDay(row.target_drtn_hr_cnt),
+        remainingDuration: hrToDay(row.remain_drtn_hr_cnt),
+        float,
+        critical: float !== null && float <= 0,
+        milestone: (row.task_type || '').includes('Mile'),
+        calendarId: row.clndr_id || '',
+        predecessors: [], successors: [],
+      };
+    });
+    const typeMap = { PR_FS: 'FS', PR_SS: 'SS', PR_FF: 'FF', PR_SF: 'SF' };
+    const relationships = (T.TASKPRED || []).map(r => ({
+      pred: idToCode[r.pred_task_id] || r.pred_task_id,
+      succ: idToCode[r.task_id] || r.task_id,
+      type: typeMap[r.pred_type] || 'FS',
+      lag: hrToDay(r.lag_hr_cnt),
+    })).filter(r => r.pred && r.succ);
+    return { activities: acts, relationships, wbs, calendars, resources, hasBaseline };
   },
 
   xml(text) {
@@ -136,36 +161,63 @@ const SchParse = {
     const txt = (el, name) => { const c = local(el, name)[0]; return c ? c.textContent.trim() : ''; };
     const durToDays = pt => {
       if (!pt) return 0;
-      const m = pt.match(/PT(?:(\d+)H)?/); return m && m[1] ? Math.round((parseFloat(m[1]) / 8) * 10) / 10 : 0;
+      const m = String(pt).match(/PT(?:(\d+)H)?/); return m && m[1] ? Math.round((parseFloat(m[1]) / 8) * 10) / 10 : 0;
     };
-    const allActs = Array.from(doc.getElementsByTagName('*')).filter(el => el.localName === 'Activity');
-    return allActs.map(el => {
+    const byTag = name => Array.from(doc.getElementsByTagName('*')).filter(el => el.localName === name);
+    const wbs = byTag('WBS').map(el => ({ xid: txt(el, 'ObjectId'), parentId: txt(el, 'ParentObjectId'), name: txt(el, 'Name'), code: txt(el, 'Code') }));
+    const wbsName = {}; wbs.forEach(w => wbsName[w.xid] = w.name);
+    const calendars = byTag('Calendar').map(el => ({ xid: txt(el, 'ObjectId'), name: txt(el, 'Name') }));
+    const resources = byTag('Resource').map(el => ({ xid: txt(el, 'ObjectId'), name: txt(el, 'Name'), code: txt(el, 'Id') }));
+    const actEls = byTag('Activity');
+    const idToCode = {}; actEls.forEach(el => idToCode[txt(el, 'ObjectId')] = txt(el, 'Id'));
+    let hasBaseline = false;
+    const acts = actEls.map(el => {
       const pct = parseFloat(txt(el, 'PercentComplete')) || 0;
       const flt = txt(el, 'TotalFloat');
       const floatDays = flt ? durToDays(flt) : null;
       const type = txt(el, 'Type');
+      const bls = schParseDate(txt(el, 'BaselineStartDate') || txt(el, 'BLEarlyStartDate'));
+      const blf = schParseDate(txt(el, 'BaselineFinishDate') || txt(el, 'BLEarlyFinishDate'));
+      if (bls || blf) hasBaseline = true;
       return {
+        xid: txt(el, 'ObjectId'),
         activityId: txt(el, 'Id'),
         name: txt(el, 'Name'),
-        wbs: txt(el, 'WBSObjectId') || txt(el, 'WBSPath'),
+        wbs: wbsName[txt(el, 'WBSObjectId')] || txt(el, 'WBSObjectId') || txt(el, 'WBSPath'),
+        wbsId: txt(el, 'WBSObjectId'),
         start: schParseDate(txt(el, 'StartDate')), finish: schParseDate(txt(el, 'FinishDate')),
-        baselineStart: schParseDate(txt(el, 'BaselineStartDate') || txt(el, 'BLEarlyStartDate')),
-        baselineFinish: schParseDate(txt(el, 'BaselineFinishDate') || txt(el, 'BLEarlyFinishDate')),
+        baselineStart: bls, baselineFinish: blf,
         actualStart: schParseDate(txt(el, 'ActualStartDate')),
         actualFinish: schParseDate(txt(el, 'ActualFinishDate')),
         pctComplete: pct <= 1 ? pct * 100 : pct,
-        duration: durToDays(txt(el, 'PlannedDuration') || txt(el, 'RemainingDuration')),
+        duration: durToDays(txt(el, 'PlannedDuration')),
+        remainingDuration: durToDays(txt(el, 'RemainingDuration')),
         float: floatDays,
         critical: txt(el, 'DrivingPath') === 'true' || (floatDays !== null && floatDays <= 0),
         milestone: /milestone/i.test(type),
+        calendarId: txt(el, 'CalendarObjectId'),
         predecessors: [], successors: [],
       };
     });
+    const typeMap = { 'Finish to Start': 'FS', 'Start to Start': 'SS', 'Finish to Finish': 'FF', 'Start to Finish': 'SF', PR_FS: 'FS', PR_SS: 'SS', PR_FF: 'FF', PR_SF: 'SF' };
+    const relationships = byTag('Relationship').map(el => {
+      const rt = txt(el, 'Type');
+      return {
+        pred: idToCode[txt(el, 'PredecessorActivityObjectId')] || txt(el, 'PredecessorActivityObjectId'),
+        succ: idToCode[txt(el, 'SuccessorActivityObjectId')] || txt(el, 'SuccessorActivityObjectId'),
+        type: typeMap[rt] || (rt || 'FS').replace(/[^A-Z]/g, '').slice(0, 2) || 'FS',
+        lag: durToDays(txt(el, 'Lag')),
+      };
+    }).filter(r => r.pred && r.succ);
+    return { activities: acts, relationships, wbs, calendars, resources, hasBaseline };
   },
 
   async parse(file) {
     const ext = (file.name.split('.').pop() || '').toLowerCase();
-    if (ext === 'xlsx' || ext === 'xls') return this.xlsx(file);
+    if (ext === 'xlsx' || ext === 'xls') {
+      const activities = await this.xlsx(file);
+      return { activities, relationships: [], wbs: [], calendars: [], resources: [], hasBaseline: activities.some(a => a.baselineStart || a.baselineFinish) };
+    }
     const text = await file.text();
     if (ext === 'xer') return this.xer(text);
     if (ext === 'xml') return this.xml(text);
@@ -271,6 +323,7 @@ const ModSchedule = {
     acts.forEach(a => {
       if (a.system === undefined) { a.system = this.detectSystem(a); dirty = true; }
       [['attachments', []], ['linkedRecords', []], ['linkedConstraints', []], ['photos', []],
+       ['predecessors', []], ['successors', []], ['remainingDuration', a.duration || 0], ['notes', ''], ['wbsId', ''], ['calendarId', ''],
        ['forecastStart', ''], ['forecastFinish', ''], ['delayCause', ''], ['delayResponsible', ''], ['delayAction', ''],
        ['contractor', ''], ['consultant', ''], ['gps', ''], ['needsApproval', false], ['needsMaterials', false], ['needsAccess', false]]
         .forEach(([k, d]) => { if (a[k] === undefined) { a[k] = d; dirty = true; } });
@@ -278,14 +331,25 @@ const ModSchedule = {
     if (dirty) Store.save();
   },
 
-  enrichOnUpload(acts) {
+  // accepts a parsed payload { activities, relationships, … } and denormalises links
+  enrichOnUpload(parsed) {
+    const acts = Array.isArray(parsed) ? parsed : parsed.activities;
+    const rels = (Array.isArray(parsed) ? [] : parsed.relationships) || [];
     const zones = Store.getMasterList('zones', { includeArchived: true });
     const streets = Store.getMasterList('streets', { includeArchived: true });
     acts.forEach(a => {
       a.system = this.detectSystem(a);
+      a.predecessors = []; a.successors = [];
       const hay = `${a.name} ${a.wbs}`;
       const z = zones.find(z => z.name && hay.includes(z.name)); if (z) a.zone = z.id;
       const s = streets.find(s => s.name && hay.includes(s.name)); if (s) a.street = s.id;
+    });
+    const byCode = {}; acts.forEach(a => byCode[a.activityId] = a);
+    rels.forEach(r => {
+      const p = byCode[r.pred], s = byCode[r.succ];
+      if (!p || !s) return;
+      s.predecessors.push({ code: p.activityId, type: r.type, lag: r.lag || 0 });
+      p.successors.push({ code: s.activityId, type: r.type, lag: r.lag || 0 });
     });
     this.ensureDefaults(acts);
     return acts;
@@ -337,6 +401,8 @@ const ModSchedule = {
       { key: 'gantt', icon: '📅', label: TX('مخطط جانت', 'Gantt'), render: (b, rr) => this.ganttView(b, rr) },
       { key: 'delay', icon: '⏰', label: TX('تحليل التأخير', 'Delay Analysis'), render: (b, rr) => this.delayView(b, rr) },
       { key: 'critical', icon: '🔥', label: TX('المسار الحرج', 'Critical Path'), render: (b, rr) => this.criticalView(b, rr) },
+      { key: 'baseline', icon: '🎯', label: TX('مقارنة Baseline', 'Baseline vs Current'), render: (b, rr) => this.baselineView(b, rr) },
+      { key: 'scurve', icon: '📈', label: 'S-Curve', render: (b, rr) => this.sCurveView(b, rr) },
       { key: 'lookahead', icon: '👀', label: 'Look Ahead', render: (b, rr) => this.lookaheadView(b, rr) },
       { key: 'milestones', icon: '🏁', label: TX('المعالم', 'Milestones'), render: (b, rr) => this.milestonesView(b, rr) },
       { key: 'timeline', icon: '🧭', label: TX('الخط الزمني', 'Timeline'), render: (b, rr) => this.timelineView(b, rr) },
@@ -517,7 +583,16 @@ const ModSchedule = {
         return `<details><summary><span class="tw">▸</span>${S.icon} <b class="fs12">${S.label()}</b>${stats(items)}</summary>${streetLevel(items)}</details>`; }).join('');
     };
     const byZone = groupBy(list, a => a.zone || '_');
+    const file = ctx.file;
+    const relCount = (file.relationships || []).length, wbsCount = (file.wbsTree || []).length;
+    const calCount = (file.calendars || []).length, resCount = (file.resources || []).length;
+    const pill = (icon, lbl, n) => `<span class="chip" style="--cc:var(--accent)">${icon} ${lbl}: <b>${n}</b></span>`;
     b.innerHTML = `
+      <div class="flex" style="gap:6px;margin-bottom:10px;flex-wrap:wrap;font-size:11px">
+        ${pill('📋', TX('أنشطة', 'Activities'), acts.length)}${pill('🗂', 'WBS', wbsCount)}${pill('🔗', TX('علاقات', 'Relations'), relCount)}
+        ${pill('📆', TX('تقويمات', 'Calendars'), calCount)}${pill('👷', TX('موارد', 'Resources'), resCount)}
+        <span class="chip" style="--cc:${file.hasBaseline ? '#34d399' : '#94a3b8'}">🎯 Baseline: ${file.hasBaseline ? TX('نعم', 'Yes') : TX('لا', 'No')}</span>
+      </div>
       <div class="flex" style="gap:8px;margin-bottom:10px;flex-wrap:wrap">
         <input class="input" id="ex-q" placeholder="${TX('بحث في الهيكل…', 'Search structure…')}" value="${esc(f.q)}" style="max-width:260px">
         <select class="input" id="ex-st" style="max-width:160px"><option value="">${TX('الحالة: الكل', 'Status: All')}</option>
@@ -579,8 +654,11 @@ const ModSchedule = {
           ${this.SYSTEMS.map(s => `<option value="${s.key}" ${f.system === s.key ? 'selected' : ''}>${s.icon} ${s.label()}</option>`).join('')}</select>
         <label class="fs12 flex" style="gap:5px"><input type="checkbox" id="g-crit" ${f.crit ? 'checked' : ''}>🔥 ${TX('حرجة فقط', 'Critical only')}</label>
         <div class="tb-spacer"></div>
+        <button class="btn sm" id="g-zoomout" title="${TX('تصغير', 'Zoom out')}">➖</button>
         ${[['day', TX('يوم', 'Day')], ['week', TX('أسبوع', 'Week')], ['month', TX('شهر', 'Month')], ['quarter', TX('ربع', 'Quarter')], ['year', TX('سنة', 'Year')]]
           .map(([k, l]) => `<button class="btn sm ${this.ganttZoom === k ? 'primary' : ''}" data-z="${k}">${l}</button>`).join('')}
+        <button class="btn sm" id="g-zoomin" title="${TX('تكبير', 'Zoom in')}">➕</button>
+        <button class="btn sm" id="g-full" title="${TX('ملء الشاشة', 'Full screen')}">⛶</button>
       </div>
       <div class="flex fs11 mut" style="gap:14px;margin-bottom:8px;flex-wrap:wrap">
         <span><i style="display:inline-block;width:22px;height:8px;background:#94a3b8;border-radius:2px"></i> Baseline</span>
@@ -610,6 +688,10 @@ const ModSchedule = {
       </div>
       <div class="fs11 mut mt8">${shown.length}${list.length > shown.length ? ` / ${list.length} — ${TX('استخدم الفلاتر لعرض المزيد بدقة', 'use filters to narrow down')}` : ''} ${TX('نشاط', 'activities')}</div>`;
     b.querySelectorAll('[data-z]').forEach(btn => btn.onclick = () => { this.ganttZoom = btn.dataset.z; this.ganttView(b, rr); });
+    const zoomOrder = ['year', 'quarter', 'month', 'week', 'day'];
+    b.querySelector('#g-zoomin').onclick = () => { const i = zoomOrder.indexOf(this.ganttZoom); this.ganttZoom = zoomOrder[Math.min(zoomOrder.length - 1, i + 1)]; this.ganttView(b, rr); };
+    b.querySelector('#g-zoomout').onclick = () => { const i = zoomOrder.indexOf(this.ganttZoom); this.ganttZoom = zoomOrder[Math.max(0, i - 1)]; this.ganttView(b, rr); };
+    b.querySelector('#g-full').onclick = () => { const w = b.querySelector('.gantt-wrap'); if (!document.fullscreenElement && w.requestFullscreen) w.requestFullscreen(); else if (document.exitFullscreen) document.exitFullscreen(); };
     b.querySelector('#g-q').oninput = e => { f.q = e.target.value; this.ganttView(b, rr); const i = b.querySelector('#g-q'); i.focus(); i.setSelectionRange(i.value.length, i.value.length); };
     b.querySelector('#g-zone').onchange = e => { f.zone = e.target.value; this.ganttView(b, rr); };
     b.querySelector('#g-sys').onchange = e => { f.system = e.target.value; this.ganttView(b, rr); };
@@ -726,6 +808,109 @@ const ModSchedule = {
         ${!acts.length ? UI.empty('🔥') : ''}
       </div>`;
     b.querySelectorAll('tr[data-id]').forEach(tr => tr.onclick = () => this.activityDetail(tr.dataset.id, rr));
+  },
+
+  /* ================= 5b. baseline vs current ================= */
+  baselineView(b, rr) {
+    const ctx = this.guard(b, rr); if (!ctx) return;
+    const { acts } = ctx;
+    const f = this._blF || (this._blF = { q: '', only: 'all' });
+    let list = acts.filter(a => !f.q || `${a.activityId} ${a.name}`.toLowerCase().includes(f.q.toLowerCase()));
+    if (f.only === 'slip') list = list.filter(a => this.blVar(a) > 0);
+    if (f.only === 'ahead') list = list.filter(a => this.blVar(a) < 0);
+    list = list.sort((x, y) => this.blVar(y) - this.blVar(x));
+    const withBl = acts.filter(a => a.baselineFinish);
+    const slipped = withBl.filter(a => this.blVar(a) > 0);
+    const avgSlip = slipped.length ? Math.round(slipped.reduce((s, a) => s + this.blVar(a), 0) / slipped.length) : 0;
+    b.innerHTML = `
+      <div class="grid g4" style="margin-bottom:14px">
+        <div class="kpi" style="--kc:#60a5fa"><div class="k-label">${TX('أنشطة لها Baseline', 'Activities with Baseline')}</div><div class="k-value">${withBl.length}</div><div class="k-ico">🎯</div></div>
+        <div class="kpi" style="--kc:#f87171"><div class="k-label">${TX('متأخرة عن الأساس', 'Slipped vs Baseline')}</div><div class="k-value">${slipped.length}</div><div class="k-ico">📉</div></div>
+        <div class="kpi" style="--kc:#34d399"><div class="k-label">${TX('متقدمة على الأساس', 'Ahead of Baseline')}</div><div class="k-value">${withBl.filter(a => this.blVar(a) < 0).length}</div><div class="k-ico">📈</div></div>
+        <div class="kpi" style="--kc:#f5b942"><div class="k-label">${TX('متوسط الانزلاق', 'Avg Slip')}</div><div class="k-value">${avgSlip} ${TX('ي', 'd')}</div><div class="k-ico">⏱️</div></div>
+      </div>
+      <div class="flex" style="gap:8px;margin-bottom:10px;flex-wrap:wrap">
+        <input class="input" id="bl-q" placeholder="${t('search')}" value="${esc(f.q)}" style="max-width:240px">
+        ${[['all', t('all')], ['slip', TX('متأخرة', 'Slipped')], ['ahead', TX('متقدمة', 'Ahead')]].map(([k, l]) => `<button class="btn sm ${f.only === k ? 'primary' : ''}" data-only="${k}">${l}</button>`).join('')}
+        <div class="tb-spacer"></div><span class="fs11 mut">${list.length} ${TX('نشاط', 'activities')}</span>
+      </div>
+      <div class="panel" style="padding:6px 14px;overflow-x:auto">
+        <table class="tbl"><thead><tr>
+          <th>${TX('النشاط', 'Activity')}</th><th>Baseline Start</th><th>Baseline Finish</th>
+          <th>${TX('البداية الحالية', 'Current Start')}</th><th>${TX('النهاية الحالية', 'Current Finish')}</th>
+          <th>Variance</th><th>Delay Days</th>
+        </tr></thead><tbody>
+        ${list.map(a => { const v = this.blVar(a);
+          return `<tr data-id="${a.id}">
+            <td style="min-width:180px"><div class="fs12 b">${a.critical ? '🔥 ' : ''}${a.milestone ? '🏁 ' : ''}${esc(a.name)}</div><div class="fs11 mut">${esc(a.activityId)}</div></td>
+            <td class="fs12">${UI.fmtDate(a.baselineStart)}</td>
+            <td class="fs12">${UI.fmtDate(a.baselineFinish)}</td>
+            <td class="fs12">${UI.fmtDate(a.start)}</td>
+            <td class="fs12">${UI.fmtDate(a.finish)}</td>
+            <td>${a.baselineFinish ? `<span class="chip" style="--cc:${v > 0 ? '#f87171' : v < 0 ? '#34d399' : '#94a3b8'}">${v > 0 ? '+' : ''}${v}${TX('ي', 'd')}</span>` : '—'}</td>
+            <td class="fs12">${this.delayDays(a) ? `<b style="color:#f87171">${this.delayDays(a)}</b>` : '0'}</td>
+          </tr>`;
+        }).join('')}
+        </tbody></table>
+        ${!list.length ? UI.empty('🎯') : ''}
+      </div>`;
+    b.querySelector('#bl-q').oninput = e => { f.q = e.target.value; this.baselineView(b, rr); const i = b.querySelector('#bl-q'); i.focus(); i.setSelectionRange(i.value.length, i.value.length); };
+    b.querySelectorAll('[data-only]').forEach(btn => btn.onclick = () => { f.only = btn.dataset.only; this.baselineView(b, rr); });
+    b.querySelectorAll('tr[data-id]').forEach(tr => tr.onclick = () => this.activityDetail(tr.dataset.id, rr));
+  },
+  blVar(a) { return a.baselineFinish && a.finish ? schDaysBetween(a.baselineFinish, a.finish) : 0; },
+
+  /* ================= 5c. S-Curve ================= */
+  sCurveView(b, rr) {
+    const ctx = this.guard(b, rr); if (!ctx) return;
+    const { acts } = ctx;
+    const today = todayISO();
+    let min = '', max = '';
+    acts.forEach(a => {
+      [a.baselineStart, a.start, a.actualStart].forEach(d => { if (d && (!min || d < min)) min = d; });
+      [a.baselineFinish, a.finish, a.forecastFinish].forEach(d => { if (d && (!max || d > max)) max = d; });
+    });
+    if (!min || !max) { b.innerHTML = `<div class="panel" style="padding:30px;text-align:center"><div style="font-size:40px">📈</div><h3>${TX('لا توجد تواريخ كافية لرسم منحنى S', 'Not enough dates to draw the S-Curve')}</h3></div>`; return; }
+    // monthly buckets
+    const buckets = []; let d = new Date(min); d.setDate(1);
+    while (d.toISOString().slice(0, 10) <= max) { buckets.push(d.toISOString().slice(0, 10)); d = new Date(d); d.setMonth(d.getMonth() + 1); }
+    if (buckets[buckets.length - 1] < max) buckets.push(max);
+    const wTot = acts.reduce((s, a) => s + (a.duration || 1), 0) || 1;
+    const frac = (D, s, f) => { if (!s || !f) return 0; if (D <= s) return 0; if (D >= f) return 1; return schDaysBetween(s, D) / Math.max(1, schDaysBetween(s, f)); };
+    const planned = [], actual = [], forecast = [];
+    buckets.forEach(D => {
+      let pv = 0, av = 0, fc = 0;
+      acts.forEach(a => {
+        const w = a.duration || 1;
+        pv += w * frac(D, a.baselineStart || a.start, a.baselineFinish || a.finish);
+        const cs = a.actualStart || a.start, cf = a.forecastFinish || a.finish;
+        if (D <= today) av += w * Math.min(frac(D, cs, cf), (a.pctComplete || 0) / 100);
+        fc += w * frac(D, cs, cf);
+      });
+      planned.push(Math.round(pv / wTot * 100));
+      actual.push(D <= today ? Math.round(av / wTot * 100) : null);
+      forecast.push(Math.round(fc / wTot * 100));
+    });
+    // actual line only up to today
+    const actualClean = actual.map(v => v == null ? null : v);
+    const lastActualIdx = actualClean.reduce((mx, v, i) => v != null ? i : mx, 0);
+    const series = [
+      { name: TX('المخطط (Planned)', 'Planned'), color: '#60a5fa', values: planned },
+      { name: TX('الفعلي (Actual)', 'Actual'), color: '#34d399', values: actualClean.map((v, i) => i <= lastActualIdx ? (v == null ? 0 : v) : null).filter(v => v != null) },
+      { name: TX('المتوقع (Forecast)', 'Forecast'), color: '#c084fc', values: forecast },
+    ];
+    const labels = buckets.map(x => { const dt = new Date(x); return `${t('months')[dt.getMonth()]} ${String(dt.getFullYear()).slice(2)}`; });
+    const evm = this.evm(acts);
+    b.innerHTML = `
+      <div class="grid g3" style="margin-bottom:14px">
+        <div class="kpi" style="--kc:#34d399"><div class="k-label">${TX('الإنجاز الفعلي', 'Actual Progress')}</div><div class="k-value">${evm.pct}%</div><div class="k-ico">✅</div></div>
+        <div class="kpi" style="--kc:#60a5fa"><div class="k-label">${TX('المخطط حتى اليوم', 'Planned to date')}</div><div class="k-value">${evm.plannedPct}%</div><div class="k-ico">🎯</div></div>
+        <div class="kpi" style="--kc:${evm.pct >= evm.plannedPct ? '#34d399' : '#f87171'}"><div class="k-label">${TX('الانحراف', 'Variance')}</div><div class="k-value">${evm.pct - evm.plannedPct > 0 ? '+' : ''}${evm.pct - evm.plannedPct}%</div><div class="k-ico">📊</div></div>
+      </div>
+      <div class="panel">
+        <div class="panel-h"><span>📈</span><h3>${TX('منحنى S — المخطط مقابل الفعلي مقابل المتوقع', 'S-Curve — Planned vs Actual vs Forecast')}</h3></div>
+        ${Charts.line(series, { height: 300, labels })}
+      </div>`;
   },
 
   /* ================= 6. lookahead ================= */
@@ -932,6 +1117,38 @@ const ModSchedule = {
     });
   },
 
+  relRow(a, link) {
+    const target = Store.scheduleActivities(a.fileId).find(x => x.activityId === link.code);
+    const nm = target ? target.name : link.code;
+    const sk = target ? this.statusKey(target) : 'notstarted';
+    return `<div class="sch-card" data-relcode="${esc(link.code)}" style="display:flex;justify-content:space-between;gap:6px;align-items:center">
+      <span><span class="chip" style="--cc:#60a5fa">${link.type}${link.lag ? (link.lag > 0 ? '+' : '') + link.lag : ''}</span>
+        <b class="fs11">${esc(link.code)}</b> ${esc(String(nm).slice(0, 32))}</span>
+      <span class="chip" style="--cc:${this.statusColor(sk)}">${target ? Math.round(target.pctComplete || 0) + '%' : '↗'}</span></div>`;
+  },
+
+  activityTimeline(a) {
+    const ev = [];
+    if (a.actualStart) ev.push(['▶️', TX('بدأ التنفيذ فعلياً', 'Actually started'), a.actualStart]);
+    else if (a.start) ev.push(['📅', TX('بداية مخططة', 'Planned start'), a.start]);
+    if (a.baselineFinish) ev.push(['🎯', TX('النهاية الأساسية', 'Baseline finish'), a.baselineFinish]);
+    if (a.actualFinish) ev.push(['🏁', TX('اكتمل', 'Completed'), a.actualFinish]);
+    else if (a.finish) ev.push(['⏳', TX('نهاية متوقعة', 'Forecast finish'), a.forecastFinish || a.finish]);
+    const audit = Store.scheduleAuditLog().filter(e => e.activityId === a.id);
+    const lastEdit = audit[0];
+    if (lastEdit) ev.push(['✏️', `${TX('آخر تحديث', 'Last update')}: ${esc(lastEdit.field || lastEdit.action)}`, (lastEdit.at || '').slice(0, 10)]);
+    const lastAtt = (a.attachments || []).slice().sort((x, y) => (y.at || '').localeCompare(x.at || ''))[0];
+    if (lastAtt) ev.push(['📎', `${TX('آخر مرفق', 'Last attachment')}: ${esc(lastAtt.name)}`, (lastAtt.at || '').slice(0, 10)]);
+    if (a.notes) ev.push(['💬', `${TX('ملاحظة', 'Note')}: ${esc(a.notes.slice(0, 40))}`, '']);
+    const issues = (a.linkedConstraints || []).map(id => Store.get('constraint', id)).filter(Boolean).sort((x, y) => (y.createdAt || '').localeCompare(x.createdAt || ''));
+    if (issues[0]) ev.push(['🚩', `${TX('آخر معوق مرتبط', 'Last linked issue')}: ${esc(issues[0].title)}`, (issues[0].createdAt || '').slice(0, 10)]);
+    const sorted = ev.filter(e => e[2]).sort((x, y) => (x[2] || '').localeCompare(y[2] || '')).concat(ev.filter(e => !e[2]));
+    if (!sorted.length) return `<div class="fs12 mut">${TX('لا توجد أحداث', 'No events')}</div>`;
+    return `<div style="border-${LANG === 'ar' ? 'right' : 'left'}:2px solid var(--bd);padding-${LANG === 'ar' ? 'right' : 'left'}:12px;margin-top:4px">
+      ${sorted.map(e => `<div class="flex" style="gap:8px;padding:4px 0;align-items:baseline">
+        <span>${e[0]}</span><span class="fs12" style="flex:1">${e[1]}</span><span class="fs11 mut">${e[2] ? UI.fmtDate(e[2]) : ''}</span></div>`).join('')}</div>`;
+  },
+
   /* ================= activity detail (360°) ================= */
   activityDetail(id, rr) {
     const a = Store.db.schedule.activities.find(x => x.id === id); if (!a) return;
@@ -955,8 +1172,9 @@ const ModSchedule = {
         </div>
 
         <div class="grid g3" style="margin-top:14px;gap:10px">
-          ${info('Baseline Start', UI.fmtDate(a.baselineStart))}${info('Baseline Finish', UI.fmtDate(a.baselineFinish))}${info(TX('المدة', 'Duration'), `${a.duration} ${TX('يوم', 'd')}`)}
-          ${info(TX('البداية الحالية', 'Current Start'), UI.fmtDate(a.start))}${info(TX('النهاية الحالية', 'Current Finish'), UI.fmtDate(a.finish))}${info('Float', `${a.float != null ? a.float : '—'} ${a.critical ? '🔥 Critical' : ''}`)}
+          ${info('Baseline Start', UI.fmtDate(a.baselineStart))}${info('Baseline Finish', UI.fmtDate(a.baselineFinish))}${info('WBS', esc(a.wbs || '—'))}
+          ${info(TX('المدة الأصلية', 'Original Duration'), `${a.duration} ${TX('يوم', 'd')}`)}${info(TX('المدة المتبقية', 'Remaining Duration'), `${a.remainingDuration != null ? a.remainingDuration : a.duration} ${TX('يوم', 'd')}`)}${info('Float', `${a.float != null ? a.float : '—'} ${a.critical ? '🔥 Critical' : ''}`)}
+          ${info(TX('البداية الحالية', 'Current Start'), UI.fmtDate(a.start))}${info(TX('النهاية الحالية', 'Current Finish'), UI.fmtDate(a.finish))}${info(TX('الإحداثيات', 'GPS'), esc(a.gps || '—'))}
           ${info(TX('البداية الفعلية', 'Actual Start'), UI.fmtDate(a.actualStart))}${info(TX('النهاية الفعلية', 'Actual Finish'), UI.fmtDate(a.actualFinish))}${info(TX('الإنجاز', 'Progress'), `${Math.round(a.pctComplete || 0)}%`)}
         </div>
 
@@ -981,6 +1199,19 @@ const ModSchedule = {
           <label class="fs12 flex" style="gap:5px"><input type="checkbox" id="av-nm" ${a.needsMaterials ? 'checked' : ''}>📦 ${TX('يحتاج مواد', 'Needs materials')}</label>
           <label class="fs12 flex" style="gap:5px"><input type="checkbox" id="av-nc" ${a.needsAccess ? 'checked' : ''}>🛣️ ${TX('يحتاج إتاحة', 'Needs access')}</label>
         </div>
+        <div style="margin-top:10px"><label class="fl">${TX('ملاحظات', 'Notes')}</label>
+          <textarea class="input" id="av-notes" rows="2">${esc(a.notes || '')}</textarea></div>
+
+        <div class="section-t" style="margin-top:16px">🔗 ${TX('العلاقات المنطقية', 'Logic Relationships')}</div>
+        <div class="grid g2" style="gap:14px">
+          <div><div class="fs11 mut" style="margin-bottom:4px">⬅️ ${TX('السوابق (Predecessors)', 'Predecessors')} (${(a.predecessors || []).length})</div>
+            ${(a.predecessors || []).map(p => this.relRow(a, p)).join('') || `<div class="fs12 mut">${TX('لا يوجد', 'None')}</div>`}</div>
+          <div><div class="fs11 mut" style="margin-bottom:4px">➡️ ${TX('اللواحق (Successors)', 'Successors')} (${(a.successors || []).length})</div>
+            ${(a.successors || []).map(s => this.relRow(a, s)).join('') || `<div class="fs12 mut">${TX('لا يوجد', 'None')}</div>`}</div>
+        </div>
+
+        <div class="section-t" style="margin-top:16px">🧭 ${TX('الخط الزمني للنشاط', 'Activity Timeline')}</div>
+        ${this.activityTimeline(a)}
 
         <div class="section-t" style="margin-top:16px">🚩 ${TX('المعوقات المرتبطة', 'Linked Issues')}</div>
         ${(a.linkedConstraints || []).map(cid => { const c = Store.get('constraint', cid); if (!c) return '';
@@ -1017,6 +1248,10 @@ const ModSchedule = {
         </div>
       </div>`);
     const el = dr.el;
+    el.querySelectorAll('[data-relcode]').forEach(r => r.onclick = () => {
+      const target = Store.scheduleActivities(a.fileId).find(x => x.activityId === r.dataset.relcode);
+      if (target) { dr.close(); this.activityDetail(target.id, rr); }
+    });
     el.querySelector('#av-zone').onchange = () => {
       Store.updateScheduleActivity(id, { zone: el.querySelector('#av-zone').value, street: '' });
       dr.close(); this.activityDetail(id, rr);
@@ -1049,6 +1284,7 @@ const ModSchedule = {
         zone: el.querySelector('#av-zone').value, street: el.querySelector('#av-street').value,
         system: el.querySelector('#av-sys').value, gps: el.querySelector('#av-gps').value.trim(),
         needsApproval: el.querySelector('#av-na').checked, needsMaterials: el.querySelector('#av-nm').checked, needsAccess: el.querySelector('#av-nc').checked,
+        notes: el.querySelector('#av-notes').value.trim(),
         linkedConstraints: [...el.querySelector('#av-cons').selectedOptions].map(o => o.value),
         linkedRecords,
       });
@@ -1191,7 +1427,8 @@ const ModSchedule = {
       const file = fileInput.files[0];
       if (!file) return UI.toast(TX('اختر ملفاً أولاً', 'Select a file first'), 'err');
       try {
-        const acts = this.enrichOnUpload(await SchParse.parse(file));
+        const parsed = await SchParse.parse(file);
+        const acts = this.enrichOnUpload(parsed);
         if (!acts.length) throw new Error('empty');
         const ext = (file.name.split('.').pop() || '').toLowerCase();
         const meta = {
@@ -1201,9 +1438,13 @@ const ModSchedule = {
           email: sel ? b.querySelector(sel.email).value.trim() : '',
           position: sel ? b.querySelector(sel.position).value.trim() : '',
           notes: sel ? b.querySelector(sel.notes).value.trim() : '',
+          relationships: parsed.relationships || [], wbsTree: parsed.wbs || [],
+          calendars: parsed.calendars || [], resources: parsed.resources || [], hasBaseline: !!parsed.hasBaseline,
         };
         Store.addScheduleFile(meta, acts);
-        UI.toast(TX(`تم تحليل ${acts.length} نشاط وبناء اللوحات تلقائياً`, `Parsed ${acts.length} activities — dashboards built automatically`));
+        const rc = (parsed.relationships || []).length, wc = (parsed.wbs || []).length;
+        UI.toast(TX(`تم استيراد ${acts.length} نشاط · ${wc} WBS · ${rc} علاقة وبناء اللوحات تلقائياً`,
+          `Imported ${acts.length} activities · ${wc} WBS · ${rc} relationships — dashboards built`));
         rr();
       } catch (err) {
         UI.toast(TX('تعذر تحليل الملف. الصيغ المدعومة: XER / XML / XLSX.', 'Could not parse the file. Supported: XER / XML / XLSX.'), 'err');

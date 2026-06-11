@@ -83,6 +83,9 @@ const UI = {
   },
 
   optLabel(key) {
+    // managed responsible-party labels take priority
+    const rp = (Store.db.masterData && Store.db.masterData.responsibleParties || []).find(x => x.key === key);
+    if (rp) return LANG === 'ar' ? rp.name : (rp.nameEn || rp.name);
     // translate well-known option keys; fall back to raw value
     const map = {
       incoming: t('incoming'), outgoing: t('outgoing'),

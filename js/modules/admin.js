@@ -233,25 +233,20 @@ const ModAdmin = {
 
   /* ---------- master data center ---------- */
   mdCat: 'people',
+  mdProject: '*',
+  mdOrgType: '*',
   mdCategories: [
-    { key: 'people', icon: '🧑‍💼', label: () => LANG === 'ar' ? 'الأشخاص' : 'People', fields: [
-      { key: 'name', label: () => LANG === 'ar' ? 'الاسم (عربي)' : 'Name (AR)' },
-      { key: 'nameEn', label: () => 'Name (EN)' },
-      { key: 'company', label: () => LANG === 'ar' ? 'الجهة' : 'Organization', type: 'org' },
-      { key: 'position', label: () => LANG === 'ar' ? 'المسمى الوظيفي' : 'Position' },
-      { key: 'department', label: () => LANG === 'ar' ? 'القسم' : 'Department' },
-      { key: 'discipline', label: () => LANG === 'ar' ? 'التخصص' : 'Discipline' },
-      { key: 'email', label: () => 'Email' },
-      { key: 'mobile', label: () => LANG === 'ar' ? 'الجوال' : 'Mobile' },
+    { key: 'categories', icon: '🗂', schema: true, label: () => LANG === 'ar' ? 'التصنيفات' : 'Categories', fields: [
+      { key: 'labelAr', label: () => LANG === 'ar' ? 'الاسم (عربي)' : 'Name (AR)' },
+      { key: 'labelEn', label: () => 'Name (EN)' },
     ] },
-    { key: 'organizations', icon: '🏢', label: () => LANG === 'ar' ? 'الجهات / الشركات' : 'Organizations', fields: [
-      { key: 'type', label: () => LANG === 'ar' ? 'النوع' : 'Type', type: 'orgtype' },
+    { key: 'subcategories', icon: '🗃', label: () => LANG === 'ar' ? 'الفئات الفرعية' : 'Subcategories', fields: [
       { key: 'name', label: () => LANG === 'ar' ? 'الاسم (عربي)' : 'Name (AR)' },
       { key: 'nameEn', label: () => 'Name (EN)' },
-      { key: 'contactPerson', label: () => LANG === 'ar' ? 'مسؤول التواصل' : 'Contact Person' },
-      { key: 'email', label: () => 'Email' },
-      { key: 'mobile', label: () => LANG === 'ar' ? 'الجوال' : 'Mobile' },
-      { key: 'notes', label: () => LANG === 'ar' ? 'ملاحظات' : 'Notes' },
+    ] },
+    { key: 'responsibleParties', icon: '🏛', label: () => LANG === 'ar' ? 'الجهات المسؤولة' : 'Responsible Parties', fields: [
+      { key: 'name', label: () => LANG === 'ar' ? 'الاسم (عربي)' : 'Name (AR)' },
+      { key: 'nameEn', label: () => 'Name (EN)' },
     ] },
     { key: 'zones', icon: '📍', label: () => LANG === 'ar' ? 'المناطق' : 'Zones', fields: [
       { key: 'name', label: () => LANG === 'ar' ? 'الاسم (عربي)' : 'Name (AR)' },
@@ -262,9 +257,24 @@ const ModAdmin = {
       { key: 'nameEn', label: () => 'Name (EN)' },
       { key: 'zone', label: () => LANG === 'ar' ? 'المنطقة' : 'Zone', type: 'zone' },
     ] },
-    { key: 'subcategories', icon: '🗃', label: () => LANG === 'ar' ? 'الفئات الفرعية' : 'Subcategories', fields: [
+    { key: 'organizations', icon: '🏢', label: () => LANG === 'ar' ? 'الجهات / المقاولون والاستشاريون' : 'Organizations', orgFilter: true, fields: [
+      { key: 'type', label: () => LANG === 'ar' ? 'النوع' : 'Type', type: 'orgtype' },
       { key: 'name', label: () => LANG === 'ar' ? 'الاسم (عربي)' : 'Name (AR)' },
       { key: 'nameEn', label: () => 'Name (EN)' },
+      { key: 'contactPerson', label: () => LANG === 'ar' ? 'مسؤول التواصل' : 'Contact Person' },
+      { key: 'email', label: () => 'Email' },
+      { key: 'mobile', label: () => LANG === 'ar' ? 'الجوال' : 'Mobile' },
+      { key: 'notes', label: () => LANG === 'ar' ? 'ملاحظات' : 'Notes' },
+    ] },
+    { key: 'people', icon: '🧑‍💼', label: () => LANG === 'ar' ? 'الأشخاص' : 'People', fields: [
+      { key: 'name', label: () => LANG === 'ar' ? 'الاسم (عربي)' : 'Name (AR)' },
+      { key: 'nameEn', label: () => 'Name (EN)' },
+      { key: 'company', label: () => LANG === 'ar' ? 'الجهة' : 'Organization', type: 'org' },
+      { key: 'position', label: () => LANG === 'ar' ? 'المسمى الوظيفي' : 'Position' },
+      { key: 'department', label: () => LANG === 'ar' ? 'القسم' : 'Department' },
+      { key: 'discipline', label: () => LANG === 'ar' ? 'التخصص' : 'Discipline' },
+      { key: 'email', label: () => 'Email' },
+      { key: 'mobile', label: () => LANG === 'ar' ? 'الجوال' : 'Mobile' },
     ] },
     { key: 'departments', icon: '🏬', label: () => LANG === 'ar' ? 'الأقسام' : 'Departments', fields: [
       { key: 'name', label: () => LANG === 'ar' ? 'الاسم (عربي)' : 'Name (AR)' },
@@ -281,7 +291,16 @@ const ModAdmin = {
     { key: 'owner', ar: 'مالك', en: 'Owner' }, { key: 'authority', ar: 'جهة حكومية', en: 'Authority' },
     { key: 'utility', ar: 'مزود خدمة', en: 'Utility Provider' }, { key: 'other', ar: 'أخرى', en: 'Other' },
   ],
+  // identifier used in row actions (schema categories use key, master-data uses id)
+  mdId(it) { return it.id || it.key; },
+  // raw items for a category (including archived)
+  mdRawItems(catCfg) {
+    if (catCfg.schema) return Store.db.schemas.constraint.categories || [];
+    return Store.db.masterData[catCfg.key] || [];
+  },
   mdFieldDisplay(f, it) {
+    if (f.key === 'labelAr') return (it.label && it.label.ar) || '—';
+    if (f.key === 'labelEn') return (it.label && it.label.en) || '—';
     const v = it[f.key];
     if (!v) return '—';
     if (f.type === 'org') { const o = Store.getOrganization(v); return o ? (LANG === 'ar' ? o.name : (o.nameEn || o.name)) : v; }
@@ -289,32 +308,35 @@ const ModAdmin = {
     if (f.type === 'orgtype') { const o = this.orgTypeOptions.find(o2 => o2.key === v); return o ? (LANG === 'ar' ? o.ar : o.en) : v; }
     return v;
   },
-  mdFieldInput(f, val) {
+  mdFieldInput(f, it) {
+    const val = f.key === 'labelAr' ? (it && it.label && it.label.ar) : f.key === 'labelEn' ? (it && it.label && it.label.en) : (it ? it[f.key] : '');
     if (f.type === 'org') {
-      const orgs = Store.getMasterList('organizations', { onlyActive: false });
+      const orgs = Store.getMasterList('organizations', { onlyActive: false, projectId: '*' });
       return `<select class="input" id="mdf-${f.key}"><option value="">—</option>${orgs.map(o => `<option value="${o.id}" ${val === o.id ? 'selected' : ''}>${esc(LANG === 'ar' ? o.name : (o.nameEn || o.name))}</option>`).join('')}</select>`;
     }
     if (f.type === 'zone') {
-      const zones = Store.getMasterList('zones', { onlyActive: false });
+      const zones = Store.getMasterList('zones', { onlyActive: false, projectId: '*' });
       return `<select class="input" id="mdf-${f.key}"><option value="">—</option>${zones.map(z => `<option value="${z.id}" ${val === z.id ? 'selected' : ''}>${esc(LANG === 'ar' ? z.name : (z.nameEn || z.name))}</option>`).join('')}</select>`;
     }
     if (f.type === 'orgtype') {
-      return `<select class="input" id="mdf-${f.key}">${this.orgTypeOptions.map(o => `<option value="${o.key}" ${val === o.key ? 'selected' : ''}>${esc(LANG === 'ar' ? o.ar : o.en)}</option>`).join('')}</select>`;
+      const pre = this.mdOrgType !== '*' ? this.mdOrgType : '';
+      return `<select class="input" id="mdf-${f.key}">${this.orgTypeOptions.map(o => `<option value="${o.key}" ${(val || pre) === o.key ? 'selected' : ''}>${esc(LANG === 'ar' ? o.ar : o.en)}</option>`).join('')}</select>`;
     }
     return `<input class="input" id="mdf-${f.key}" value="${esc(val || '')}">`;
   },
-  mdProject: '*',
   masterData(body, rr) {
     this.mdCat = this.mdCat || 'people';
     const catCfg = this.mdCategories.find(c => c.key === this.mdCat);
-    const scoped = Store.PROJECT_SCOPED.includes(this.mdCat);
+    const scoped = !catCfg.schema && Store.PROJECT_SCOPED.includes(this.mdCat);
     const projOf = it => { const p = Store.db.projects.find(x => x.id === it.projectId); return p ? (p.code || p.name) : (it.projectId ? it.projectId : (LANG === 'ar' ? 'مشترك' : 'Shared')); };
-    let items = Store.getMasterList(this.mdCat, { includeArchived: true, projectId: '*' });
+    let items = this.mdRawItems(catCfg).slice();
     if (scoped && this.mdProject !== '*') {
       items = this.mdProject === '_shared' ? items.filter(i => !i.projectId) : items.filter(i => i.projectId === this.mdProject);
     }
+    if (catCfg.orgFilter && this.mdOrgType !== '*') items = items.filter(i => i.type === this.mdOrgType);
+    const colspan = catCfg.fields.length + 1 + (scoped ? 1 : 0) + 1;
     body.innerHTML = `
-      <div style="display:grid;grid-template-columns:220px 1fr;gap:16px;align-items:start">
+      <div style="display:grid;grid-template-columns:230px 1fr;gap:16px;align-items:start">
         <div class="panel">
           <div class="panel-h"><h3>🗄 ${LANG === 'ar' ? 'البيانات الرئيسية' : 'Master Data'}</h3></div>
           <div class="flex" style="flex-direction:column;gap:6px">
@@ -323,9 +345,13 @@ const ModAdmin = {
         </div>
         <div class="panel" style="overflow-x:auto">
           <div class="panel-h"><h3>${catCfg.icon} ${catCfg.label()}</h3><div class="spacer"></div>
+            ${catCfg.orgFilter ? `<select class="input sm" id="md-otype" style="width:auto;margin-inline-end:8px">
+              <option value="*" ${this.mdOrgType === '*' ? 'selected' : ''}>${LANG === 'ar' ? 'كل الأنواع' : 'All types'}</option>
+              ${this.orgTypeOptions.map(o => `<option value="${o.key}" ${this.mdOrgType === o.key ? 'selected' : ''}>${esc(LANG === 'ar' ? o.ar : o.en)}</option>`).join('')}
+            </select>` : ''}
             ${scoped ? `<select class="input sm" id="md-proj" style="width:auto;margin-inline-end:8px">
               <option value="*" ${this.mdProject === '*' ? 'selected' : ''}>${LANG === 'ar' ? 'كل المشاريع' : 'All projects'}</option>
-              <option value="_shared" ${this.mdProject === '_shared' ? 'selected' : ''}>${LANG === 'ar' ? 'مشترك (كل المشاريع)' : 'Shared'}</option>
+              <option value="_shared" ${this.mdProject === '_shared' ? 'selected' : ''}>${LANG === 'ar' ? 'مشترك' : 'Shared'}</option>
               ${Store.db.projects.map(p => `<option value="${p.id}" ${this.mdProject === p.id ? 'selected' : ''}>${esc(p.code || p.name)}</option>`).join('')}
             </select>` : ''}
             <button class="btn primary sm" id="md-add">＋ ${t('add')}</button></div>
@@ -333,26 +359,32 @@ const ModAdmin = {
           ${items.map(it => `<tr style="${it.archived ? 'opacity:.5' : ''}">
             ${catCfg.fields.map(f => `<td class="fs12">${esc(this.mdFieldDisplay(f, it))}</td>`).join('')}
             ${scoped ? `<td class="fs12">${esc(projOf(it))}</td>` : ''}
-            <td>${it.archived ? `<span class="tag">${LANG === 'ar' ? 'مؤرشف' : 'archived'}</span>` : (it.active === false ? `<span class="tag">${LANG === 'ar' ? 'غير نشط' : 'inactive'}</span>` : `<span class="tag" style="background:rgba(52,211,153,.15);color:#34d399">${LANG === 'ar' ? 'نشط' : 'active'}</span>`)}</td>
+            <td>${it.archived ? `<span class="tag">${LANG === 'ar' ? 'مؤرشف' : 'archived'}</span>` : (it.active === false ? `<span class="tag">${LANG === 'ar' ? 'موقوف' : 'inactive'}</span>` : `<span class="tag" style="background:rgba(52,211,153,.15);color:#34d399">${LANG === 'ar' ? 'نشط' : 'active'}</span>`)}</td>
             <td style="white-space:nowrap">
-              <button class="btn sm" data-mded="${it.id}">✏️</button>
-              <button class="btn sm" data-mdarc="${it.id}">${it.archived ? '♻️' : '🗄'}</button>
-              <button class="btn sm danger" data-mdrm="${it.id}">🗑</button>
-            </td></tr>`).join('') || `<tr><td colspan="${catCfg.fields.length + (scoped ? 3 : 2)}">${UI.empty('🗄')}</td></tr>`}
+              <button class="btn sm" data-mded="${this.mdId(it)}" title="${LANG === 'ar' ? 'تعديل' : 'Edit'}">✏️</button>
+              <button class="btn sm" data-mdact="${this.mdId(it)}" title="${it.active === false ? (LANG === 'ar' ? 'تفعيل' : 'Activate') : (LANG === 'ar' ? 'إيقاف' : 'Deactivate')}">${it.active === false ? '▶️' : '⏸'}</button>
+              <button class="btn sm" data-mdarc="${this.mdId(it)}" title="${it.archived ? (LANG === 'ar' ? 'استعادة' : 'Restore') : (LANG === 'ar' ? 'أرشفة' : 'Archive')}">${it.archived ? '♻️' : '🗄'}</button>
+              <button class="btn sm" data-mdmrg="${this.mdId(it)}" title="${LANG === 'ar' ? 'دمج مع عنصر آخر' : 'Merge into another'}">🔀</button>
+              <button class="btn sm danger" data-mdrm="${this.mdId(it)}" title="${t('delete')}">🗑</button>
+            </td></tr>`).join('') || `<tr><td colspan="${colspan}">${UI.empty('🗄')}</td></tr>`}
           </tbody></table>
-          <div class="fs11 mut mt8">${LANG === 'ar' ? 'العناصر المؤرشفة تبقى مرتبطة بالسجلات القديمة لكنها تختفي من القوائم الجديدة. «مشترك» يظهر في كل المشاريع.' : 'Archived items stay linked to old records but are hidden from new dropdowns. “Shared” items appear in every project.'}</div>
+          <div class="fs11 mut mt8">${LANG === 'ar' ? 'المؤرشف يبقى مرتبطاً بالسجلات القديمة لكنه يختفي من القوائم الجديدة. «الدمج» ينقل سجلات العنصر المكرر إلى عنصر آخر ثم يحذفه. «الإيقاف» يخفيه من القوائم دون أرشفته.' : 'Archived items stay linked to old records but hide from new dropdowns. “Merge” repoints a duplicate’s records onto another item then deletes it. “Deactivate” hides it from lists without archiving.'}</div>
         </div>
       </div>`;
     body.querySelectorAll('[data-mdc]').forEach(b => b.onclick = () => { this.mdCat = b.dataset.mdc; rr(); });
     const projSel = body.querySelector('#md-proj');
     if (projSel) projSel.onchange = () => { this.mdProject = projSel.value; rr(); };
+    const otypeSel = body.querySelector('#md-otype');
+    if (otypeSel) otypeSel.onchange = () => { this.mdOrgType = otypeSel.value; rr(); };
+
+    const findItem = id => items.find(i => this.mdId(i) === id) || this.mdRawItems(catCfg).find(i => this.mdId(i) === id);
 
     const itemForm = (it) => {
       const projOpts = `<option value="">${LANG === 'ar' ? 'مشترك (كل المشاريع)' : 'Shared (all projects)'}</option>${Store.db.projects.map(p => `<option value="${p.id}" ${(it ? it.projectId : (this.mdProject !== '*' && this.mdProject !== '_shared' ? this.mdProject : Store.db.currentProjectId)) === p.id ? 'selected' : ''}>${esc(p.code || p.name)}</option>`).join('')}`;
       const m = UI.modal(`
         <div class="drawer-h"><h2>${it ? '✏️' : '＋'} ${catCfg.label()}</h2><button class="x-btn" data-close>✕</button></div>
         <div class="drawer-b"><div class="form-grid">
-          ${catCfg.fields.map(f => `<div><label class="fl">${f.label()}</label>${this.mdFieldInput(f, it ? it[f.key] : '')}</div>`).join('')}
+          ${catCfg.fields.map(f => `<div><label class="fl">${f.label()}</label>${this.mdFieldInput(f, it)}</div>`).join('')}
           ${scoped ? `<div><label class="fl">${LANG === 'ar' ? 'المشروع' : 'Project'}</label><select class="input" id="mdf-projectId">${projOpts}</select></div>` : ''}
           <div><label class="fl">${LANG === 'ar' ? 'نشط' : 'Active'}</label><select class="input" id="mdf-active">
             <option value="1" ${!it || it.active !== false ? 'selected' : ''}>${t('yes')}</option>
@@ -360,27 +392,55 @@ const ModAdmin = {
         </div></div>
         <div class="drawer-f"><button class="btn primary" id="mdf-save">💾 ${t('save')}</button></div>`);
       m.el.querySelector('#mdf-save').onclick = () => {
-        const data = {};
-        catCfg.fields.forEach(f => { data[f.key] = m.el.querySelector(`#mdf-${f.key}`).value.trim(); });
-        if (!data.name && !data.nameEn) return UI.toast(t('required'), 'err');
-        data.active = m.el.querySelector('#mdf-active').value === '1';
-        if (scoped) data.projectId = m.el.querySelector('#mdf-projectId').value || undefined;
-        if (it) { Object.assign(it, data); if (scoped && !data.projectId) delete it.projectId; }
-        else { data.id = uid(this.mdCat); data.archived = false; Store.db.masterData[this.mdCat].push(data); }
+        const active = m.el.querySelector('#mdf-active').value === '1';
+        if (catCfg.schema) {
+          const ar = m.el.querySelector('#mdf-labelAr').value.trim();
+          const en = m.el.querySelector('#mdf-labelEn').value.trim();
+          if (!ar && !en) return UI.toast(t('required'), 'err');
+          if (it) { it.label = { ar: ar || en, en: en || ar }; it.active = active; }
+          else { Store.db.schemas.constraint.categories.push({ key: 'cat_' + uid('c'), label: { ar: ar || en, en: en || ar }, active, archived: false }); }
+        } else {
+          const data = {};
+          catCfg.fields.forEach(f => { data[f.key] = m.el.querySelector(`#mdf-${f.key}`).value.trim(); });
+          if (!data.name && !data.nameEn) return UI.toast(t('required'), 'err');
+          data.active = active;
+          if (scoped) data.projectId = m.el.querySelector('#mdf-projectId').value || undefined;
+          if (it) { Object.assign(it, data); if (scoped && !data.projectId) delete it.projectId; }
+          else { data.id = uid(this.mdCat); data.archived = false; if (this.mdCat === 'responsibleParties') data.key = uid('rp'); Store.db.masterData[this.mdCat].push(data); }
+        }
         Store.save(); m.close(); UI.toast(t('saved')); rr();
       };
     };
+
+    const mergeForm = (fromId) => {
+      const others = this.mdRawItems(catCfg).filter(i => this.mdId(i) !== fromId);
+      const nameOf = i => catCfg.schema ? tl(i.label) : (LANG === 'ar' ? i.name : (i.nameEn || i.name));
+      const m = UI.modal(`
+        <div class="drawer-h"><h2>🔀 ${LANG === 'ar' ? 'دمج عنصر مكرر' : 'Merge duplicate'}</h2><button class="x-btn" data-close>✕</button></div>
+        <div class="drawer-b">
+          <div class="fs12 mut" style="margin-bottom:10px">${LANG === 'ar' ? 'سيتم نقل كل السجلات المرتبطة بهذا العنصر إلى العنصر المختار، ثم حذف العنصر المكرر.' : "All records linked to this item will be repointed to the chosen item, then the duplicate is deleted."}</div>
+          <label class="fl">${LANG === 'ar' ? 'الدمج في' : 'Merge into'}</label>
+          <select class="input" id="mrg-to"><option value="">— ${LANG === 'ar' ? 'اختر' : 'Select'} —</option>${others.map(i => `<option value="${this.mdId(i)}">${esc(nameOf(i))}</option>`).join('')}</select>
+        </div>
+        <div class="drawer-f"><button class="btn primary" id="mrg-go">🔀 ${LANG === 'ar' ? 'دمج' : 'Merge'}</button><button class="btn" data-close>${t('cancel')}</button></div>`);
+      m.el.querySelector('#mrg-go').onclick = () => {
+        const toId = m.el.querySelector('#mrg-to').value;
+        if (!toId) return UI.toast(t('required'), 'err');
+        Store.mergeMasterItems(this.mdCat, fromId, toId);
+        m.close(); UI.toast(LANG === 'ar' ? 'تم الدمج' : 'Merged'); rr();
+      };
+    };
+
     body.querySelector('#md-add').onclick = () => itemForm(null);
-    body.querySelectorAll('[data-mded]').forEach(b => b.onclick = () => itemForm(items.find(i => i.id === b.dataset.mded)));
-    body.querySelectorAll('[data-mdarc]').forEach(b => b.onclick = () => {
-      const it = items.find(i => i.id === b.dataset.mdarc);
-      it.archived = !it.archived; Store.save(); rr();
-    });
+    body.querySelectorAll('[data-mded]').forEach(b => b.onclick = () => itemForm(findItem(b.dataset.mded)));
+    body.querySelectorAll('[data-mdact]').forEach(b => b.onclick = () => { const it = findItem(b.dataset.mdact); it.active = it.active === false ? true : false; Store.save(); rr(); });
+    body.querySelectorAll('[data-mdarc]').forEach(b => b.onclick = () => { const it = findItem(b.dataset.mdarc); it.archived = !it.archived; Store.save(); rr(); });
+    body.querySelectorAll('[data-mdmrg]').forEach(b => b.onclick = () => mergeForm(b.dataset.mdmrg));
     body.querySelectorAll('[data-mdrm]').forEach(b => b.onclick = () => UI.confirm(t('confirmDelete'), () => {
-      Store.db.masterData[this.mdCat] = Store.db.masterData[this.mdCat].filter(i => i.id !== b.dataset.mdrm);
-      Store.save(); rr();
+      Store.deleteMasterItem(this.mdCat, b.dataset.mdrm); rr();
     }));
   },
+
 
   /* ---------- users ---------- */
   users(body, rr) {

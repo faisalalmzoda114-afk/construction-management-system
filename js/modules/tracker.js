@@ -157,7 +157,7 @@ const ModTracker = {
     const rate = all.length ? Math.round(closed.length / all.length * 100) : 0;
     const sch = Store.schema('constraint');
     const buckets = [[0, 7], [8, 14], [15, 30], [31, 60], [61, 90], [91, 9999]];
-    const partyOpts = ['contractor', 'consultant', 'developer', 'client', 'authority', 'internal'];
+    const partyOpts = Store.getMasterList('responsibleParties').map(p => p.key);
 
     b.innerHTML = `
       <div class="grid g4" style="margin-bottom:16px">
@@ -277,7 +277,7 @@ const ModTracker = {
     if (f.dueTo) recs = recs.filter(r => (r.dueDate || '') <= f.dueTo);
     recs.sort((a, b2) => (b2.createdAt || '').localeCompare(a.createdAt || ''));
 
-    const partyOpts = ['contractor', 'consultant', 'developer', 'client', 'authority', 'internal'];
+    const partyOpts = Store.getMasterList('responsibleParties').map(p => p.key);
     b.innerHTML = `
       <div class="reg-toolbar">
         <input class="input" id="tk-q" placeholder="🔍 ${t('search')}" value="${esc(f.q)}" style="min-width:180px">
@@ -472,11 +472,6 @@ const ModTracker = {
         `<option value="__add">+ ${TX('إضافة شارع جديد', 'Add new street')}</option>`;
     };
 
-    const tagPresets = [
-      { ar: 'مرافق', en: 'Utilities' }, { ar: 'أسفلت', en: 'Asphalt' }, { ar: 'تصريف أمطار', en: 'Stormwater' },
-      { ar: 'اتصالات', en: 'Telecom' }, { ar: 'كهرباء', en: 'Electricity' }, { ar: 'إغلاق طريق', en: 'Road Closure' },
-      { ar: 'مطور', en: 'Developer' }, { ar: 'تصريح', en: 'Permit' }, { ar: 'سلامة', en: 'Safety' }, { ar: 'جودة', en: 'Quality' },
-    ];
     const curTags = cur.tags || [];
     let draftEvidence = (rec && rec.evidence) ? [] : [];
     const relatedLinks = (preset && preset.links) ? preset.links.slice() : [];
@@ -499,19 +494,9 @@ const ModTracker = {
         <div class="section-t">📝 ${TX('التفاصيل الأساسية', 'Core Details')}</div>
         <div class="form-grid">
           <div class="full"><label class="fl">${tl(F('title').label)} <span class="req">*</span></label>${UI.fieldInput(F('title'), cur.title)}</div>
-          <div class="full"><label class="fl">${tl(F('description').label)}</label>${UI.fieldInput(F('description'), cur.description)}
-            <div class="flexw mt8" style="gap:6px">
-              <button type="button" class="btn xs" id="ai-title">✨ ${TX('اقتراح عنوان', 'Suggest Title')}</button>
-              <button type="button" class="btn xs" id="ai-summary">✨ ${TX('توليد ملخص', 'Generate Summary')}</button>
-              <button type="button" class="btn xs" id="ai-resp">✨ ${TX('اقتراح الجهة المسؤولة', 'Suggest Responsible Party')}</button>
-              <button type="button" class="btn xs" id="ai-cat">✨ ${TX('اقتراح التصنيف', 'Suggest Category')}</button>
-              <button type="button" class="btn xs" id="ai-pri">✨ ${TX('اقتراح الأولوية', 'Suggest Priority')}</button>
-              <button type="button" class="btn xs" id="ai-next">✨ ${TX('اقتراح الإجراء التالي', 'Suggest Next Action')}</button>
-            </div>
-            <div class="fs11 mut mt8" id="ai-next-out"></div>
-          </div>
+          <div class="full"><label class="fl">${tl(F('description').label)}</label>${UI.fieldInput(F('description'), cur.description)}</div>
           <div><label class="fl">${TX('التصنيف', 'Category')}</label>
-            <select class="input" data-fk="category" id="cr-cat"><option value="">—</option>${sch.categories.map(c => `<option value="${c.key}" ${cur.category === c.key ? 'selected' : ''}>${tl(c.label)}</option>`).join('')}
+            <select class="input" data-fk="category" id="cr-cat"><option value="">—</option>${sch.categories.filter(c => !c.archived || cur.category === c.key).map(c => `<option value="${c.key}" ${cur.category === c.key ? 'selected' : ''}>${tl(c.label)}</option>`).join('')}
             <option value="__add">+ ${TX('إضافة فئة جديدة', 'Add new category')}</option></select></div>
           <div><label class="fl">${tl(F('subcategory').label)}</label><input class="input" data-fk="subcategory" list="dl-subcats-md" value="${esc(cur.subcategory || '')}"></div>
           <div><label class="fl">${tl(F('priority').label)}</label>${UI.fieldInput(F('priority'), cur.priority)}</div>
@@ -535,7 +520,9 @@ const ModTracker = {
         <div class="section-t">👥 ${TX('المسؤولية والأطراف', 'Responsibility & Parties')}</div>
         <div class="fs11 mut" style="margin-bottom:8px">${TX('القوائم خاصة بهذا المشروع — اكتب للبحث أو اكتب اسماً جديداً ثم اضغط «إضافة».', 'Lists are specific to this project — type to search, or type a new name and press “Add”.')}</div>
         <div class="form-grid">
-          <div><label class="fl">${tl(F('responsibleParty').label)} <span class="req">*</span></label>${UI.fieldInput(F('responsibleParty'), cur.responsibleParty)}</div>
+          <div><label class="fl">${tl(F('responsibleParty').label)} <span class="req">*</span></label>
+            <select class="input" data-fk="responsibleParty"><option value="">${TX('— اختر —', '— Select —')}</option>
+            ${Store.getMasterList('responsibleParties').filter(p => !p.archived || cur.responsibleParty === p.key).map(p => `<option value="${p.key}" ${cur.responsibleParty === p.key ? 'selected' : ''}>${esc(LANG === 'ar' ? p.name : (p.nameEn || p.name))}</option>`).join('')}</select></div>
           ${comboCell(tl(F('currentOwner').label), 'currentOwner', cur.currentOwner || Store.db.currentUserId, personCfg(true))}
           ${comboCell(tl(F('assignedTo').label), 'assignedTo', cur.assignedTo, personCfg(false))}
           ${comboCell(tl(F('raisedBy').label), 'raisedBy', cur.raisedBy || Store.db.currentUserId, personCfg(false))}
@@ -600,11 +587,8 @@ const ModTracker = {
           <div class="full flexw" id="cr-rel-list" style="gap:6px"></div>
         </div>` : ''}
 
-        <div class="section-t">🏷️ ${TX('الوسوم الذكية', 'Smart Tags')}</div>
-        <div class="flexw" id="cr-tag-chips" style="gap:6px;margin-bottom:8px">
-          ${tagPresets.map(tg => `<span class="chip lg" data-tag="${esc(tg.ar)}|${esc(tg.en)}" style="cursor:pointer">${esc(LANG === 'ar' ? tg.ar : tg.en)}</span>`).join('')}
-        </div>
-        <input class="input" data-fk="tags" id="cr-tags-input" value="${esc(curTags.join(', '))}" placeholder="${TX('وسوم مخصصة، افصل بفاصلة', 'custom tags, comma separated')}">
+        <div class="section-t">🏷️ ${TX('الوسوم', 'Tags')}</div>
+        <input class="input" data-fk="tags" id="cr-tags-input" value="${esc(curTags.join(', '))}" placeholder="${TX('افصل بفاصلة', 'comma separated')}">
 
         <div class="section-t">👁️ ${TX('معاينة الملف', 'Issue Preview')}</div>
         <div class="panel" id="cr-preview" style="margin-bottom:10px">
@@ -755,76 +739,6 @@ const ModTracker = {
       renderRel();
     }
 
-    /* ---- smart tags ---- */
-    m.el.querySelectorAll('[data-tag]').forEach(chip => {
-      const [ar, en] = chip.dataset.tag.split('|');
-      const val = LANG === 'ar' ? ar : en;
-      const inp = m.el.querySelector('#cr-tags-input');
-      if (curTags.includes(val)) chip.style.background = 'var(--accent)';
-      chip.onclick = () => {
-        let arr = inp.value.split(',').map(s => s.trim()).filter(Boolean);
-        if (arr.includes(val)) { arr = arr.filter(x => x !== val); chip.style.background = ''; }
-        else { arr.push(val); chip.style.background = 'var(--accent)'; }
-        inp.value = arr.join(', ');
-      };
-    });
-
-    /* ---- AI assistance (heuristic suggestions) ---- */
-    const descEl = m.el.querySelector('[data-fk="description"]');
-    const titleEl = m.el.querySelector('[data-fk="title"]');
-    const catEl = m.el.querySelector('#cr-cat');
-    const priEl = m.el.querySelector('[data-fk="priority"]');
-    const respEl = m.el.querySelector('[data-fk="responsibleParty"]');
-    const notesEl = m.el.querySelector('[data-fk="notes"]');
-    const desc = () => (descEl ? descEl.value : '').trim();
-
-    m.el.querySelector('#ai-title').onclick = () => {
-      const d = desc(); if (!d) { UI.toast(TX('أدخل الوصف أولاً', 'Enter a description first'), 'err'); return; }
-      const words = d.split(/\s+/).slice(0, 8).join(' ');
-      const zoneTxt = zoneSel.value && zoneSel.value !== '__add' ? ` — ${zoneSel.value}` : '';
-      titleEl.value = words + (d.split(/\s+/).length > 8 ? '…' : '') + zoneTxt;
-    };
-    m.el.querySelector('#ai-summary').onclick = () => {
-      const d = desc(); if (!d) { UI.toast(TX('أدخل الوصف أولاً', 'Enter a description first'), 'err'); return; }
-      if (notesEl) notesEl.value = d.length > 160 ? d.slice(0, 160) + '…' : d;
-      UI.toast(TX('تم إدراج الملخص في الملاحظات', 'Summary inserted into notes'));
-    };
-    m.el.querySelector('#ai-resp').onclick = () => {
-      const d = desc();
-      let v = 'internal';
-      if (/مقاول|contractor/i.test(d)) v = 'contractor';
-      else if (/استشاري|consultant/i.test(d)) v = 'consultant';
-      else if (/مطور|developer/i.test(d)) v = 'developer';
-      else if (/أمانة|بلدية|حكوم|authority/i.test(d)) v = 'authority';
-      else if (/عميل|client/i.test(d)) v = 'client';
-      respEl.value = v;
-    };
-    m.el.querySelector('#ai-cat').onclick = () => {
-      const d = desc();
-      const map = [
-        [/كهرب|electric/i, 'utility'], [/مياه|صرف|water|drain/i, 'utility'],
-        [/تأخر.*مقاول|مقاول.*تأخر|contractor delay/i, 'contractorDelay'],
-        [/مطور|developer/i, 'developerDep'], [/تصريح|أمانة|بلدية|permit|authority/i, 'authority'],
-        [/تصميم|design/i, 'design'], [/أرض|حرم|land|right of way/i, 'landAccess'],
-        [/نقل|لوجست|logistic/i, 'logistics'], [/مالي|تكلفة|commercial/i, 'commercial'],
-      ];
-      let key = 'other';
-      for (const [re, k] of map) if (re.test(d)) { key = k; break; }
-      if (catEl.querySelector(`option[value="${key}"]`)) catEl.value = key;
-    };
-    m.el.querySelector('#ai-pri').onclick = () => {
-      const d = desc();
-      priEl.value = /حرج|عاجل|خطير|critical|urgent|severe/i.test(d) ? 'high' : 'medium';
-    };
-    m.el.querySelector('#ai-next').onclick = () => {
-      const d = desc();
-      const out = m.el.querySelector('#ai-next-out');
-      let txt;
-      if (/حرج|عاجل|critical|urgent/i.test(d)) txt = TX('يوصى بالتصعيد الفوري وإشعار الإدارة التنفيذية.', 'Recommend immediate escalation and notify executive management.');
-      else if (/مقاول|contractor/i.test(d)) txt = TX('يوصى بإرسال متابعة رسمية للمقاول مع تحديد مهلة للرد.', 'Recommend sending an official follow-up to the contractor with a response deadline.');
-      else txt = TX('يوصى بمتابعة دورية مع الجهة المسؤولة حتى الحل.', 'Recommend routine follow-up with the responsible party until resolved.');
-      out.textContent = '🎯 ' + txt;
-    };
 
     /* ---- preview ---- */
     m.el.querySelector('#cr-preview-btn').onclick = () => {

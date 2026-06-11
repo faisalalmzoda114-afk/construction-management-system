@@ -759,6 +759,19 @@ function seedDB() {
         { id: 'sev3', label: { ar: 'عالية', en: 'High' }, key: 'high', active: true, archived: false },
         { id: 'sev4', label: { ar: 'حرجة', en: 'Critical' }, key: 'critical', active: true, archived: false },
       ],
+
+      // Responsible Parties (managed list used by the issue "Responsible Party" field)
+      responsibleParties: [
+        { id: 'rp_contractor', key: 'contractor', name: 'المقاول', nameEn: 'Contractor', active: true, archived: false },
+        { id: 'rp_consultant', key: 'consultant', name: 'الاستشاري', nameEn: 'Consultant', active: true, archived: false },
+        { id: 'rp_developer', key: 'developer', name: 'المطور', nameEn: 'Developer', active: true, archived: false },
+        { id: 'rp_client', key: 'client', name: 'العميل', nameEn: 'Client', active: true, archived: false },
+        { id: 'rp_authority', key: 'authority', name: 'الجهات الحكومية', nameEn: 'Authority', active: true, archived: false },
+        { id: 'rp_internal', key: 'internal', name: 'فريق المشروع', nameEn: 'Internal Team', active: true, archived: false },
+        { id: 'rp_power', key: 'power', name: 'شركة الكهرباء', nameEn: 'Electricity Company', active: true, archived: false },
+        { id: 'rp_water', key: 'water', name: 'شركة المياه', nameEn: 'Water Company', active: true, archived: false },
+        { id: 'rp_telecom', key: 'telecom', name: 'شركة الاتصالات', nameEn: 'Telecom Company', active: true, archived: false },
+      ],
     },
   };
   seedProjectParties(db);
@@ -1182,6 +1195,51 @@ const Store = {
   },
   getProjectPeople(projectId) {
     return this.getMasterList('people', { projectId });
+  },
+
+  // responsible-party label from its stored key
+  respPartyLabel(key) {
+    const it = (this.db.masterData.responsibleParties || []).find(x => x.key === key || x.id === key);
+    return it ? (LANG === 'ar' ? it.name : (it.nameEn || it.name)) : key;
+  },
+
+  // delete a master-data / schema-category item
+  deleteMasterItem(category, id) {
+    if (category === 'categories') {
+      const cats = this.db.schemas.constraint.categories || [];
+      this.db.schemas.constraint.categories = cats.filter(c => c.key !== id);
+    } else if (this.db.masterData[category]) {
+      this.db.masterData[category] = this.db.masterData[category].filter(i => i.id !== id);
+    }
+    this.save();
+  },
+
+  // merge a duplicate into a target: repoint existing issue records, then remove the duplicate
+  mergeMasterItems(category, fromId, toId) {
+    if (fromId === toId) return;
+    const recs = this.db.entities.constraint || [];
+    const md = this.db.masterData;
+    const nameOf = (arr, id, k) => { const it = (arr || []).find(x => x.id === id); return it ? (k === 'key' ? it.key : it.name) : id; };
+    let fromVal, toVal, fields;
+    if (category === 'categories') {
+      fromVal = fromId; toVal = toId; fields = ['category'];
+    } else if (category === 'responsibleParties') {
+      fromVal = nameOf(md.responsibleParties, fromId, 'key'); toVal = nameOf(md.responsibleParties, toId, 'key'); fields = ['responsibleParty'];
+    } else if (category === 'organizations') {
+      fromVal = fromId; toVal = toId; fields = ['contractor', 'consultant', 'developer', 'clientParty'];
+    } else if (category === 'people') {
+      fromVal = fromId; toVal = toId; fields = ['currentOwner', 'assignedTo', 'raisedBy', 'reviewer', 'approver'];
+    } else if (category === 'zones') {
+      fromVal = nameOf(md.zones, fromId); toVal = nameOf(md.zones, toId); fields = ['zone'];
+      (md.streets || []).forEach(s => { if (s.zone === fromId) s.zone = toId; });
+    } else if (category === 'streets') {
+      fromVal = nameOf(md.streets, fromId); toVal = nameOf(md.streets, toId); fields = ['street'];
+    } else if (category === 'subcategories') {
+      fromVal = nameOf(md.subcategories, fromId); toVal = nameOf(md.subcategories, toId); fields = ['subcategory'];
+    } else { fromVal = fromId; toVal = toId; fields = []; }
+    recs.forEach(r => fields.forEach(f => { if (r[f] === fromVal) r[f] = toVal; }));
+    this.deleteMasterItem(category, fromId);
+    this.save();
   },
 
   // People & Organization Directory

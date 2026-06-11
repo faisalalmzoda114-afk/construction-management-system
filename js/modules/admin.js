@@ -236,7 +236,7 @@ const ModAdmin = {
   mdProject: '*',
   mdOrgType: '*',
   mdCategories: [
-    { key: 'categories', icon: '🗂', schema: true, label: () => LANG === 'ar' ? 'التصنيفات' : 'Categories', fields: [
+    { key: 'categories', icon: '🗂', labelBased: true, label: () => LANG === 'ar' ? 'التصنيفات' : 'Categories', fields: [
       { key: 'labelAr', label: () => LANG === 'ar' ? 'الاسم (عربي)' : 'Name (AR)' },
       { key: 'labelEn', label: () => 'Name (EN)' },
     ] },
@@ -295,7 +295,6 @@ const ModAdmin = {
   mdId(it) { return it.id || it.key; },
   // raw items for a category (including archived)
   mdRawItems(catCfg) {
-    if (catCfg.schema) return Store.db.schemas.constraint.categories || [];
     return Store.db.masterData[catCfg.key] || [];
   },
   mdFieldDisplay(f, it) {
@@ -327,7 +326,7 @@ const ModAdmin = {
   masterData(body, rr) {
     this.mdCat = this.mdCat || 'people';
     const catCfg = this.mdCategories.find(c => c.key === this.mdCat);
-    const scoped = !catCfg.schema && Store.PROJECT_SCOPED.includes(this.mdCat);
+    const scoped = Store.PROJECT_SCOPED.includes(this.mdCat);
     const projOf = it => { const p = Store.db.projects.find(x => x.id === it.projectId); return p ? (p.code || p.name) : (it.projectId ? it.projectId : (LANG === 'ar' ? 'مشترك' : 'Shared')); };
     let items = this.mdRawItems(catCfg).slice();
     if (scoped && this.mdProject !== '*') {
@@ -393,18 +392,19 @@ const ModAdmin = {
         <div class="drawer-f"><button class="btn primary" id="mdf-save">💾 ${t('save')}</button></div>`);
       m.el.querySelector('#mdf-save').onclick = () => {
         const active = m.el.querySelector('#mdf-active').value === '1';
-        if (catCfg.schema) {
+        const projectId = scoped ? (m.el.querySelector('#mdf-projectId').value || undefined) : undefined;
+        if (catCfg.labelBased) {
           const ar = m.el.querySelector('#mdf-labelAr').value.trim();
           const en = m.el.querySelector('#mdf-labelEn').value.trim();
           if (!ar && !en) return UI.toast(t('required'), 'err');
-          if (it) { it.label = { ar: ar || en, en: en || ar }; it.active = active; }
-          else { Store.db.schemas.constraint.categories.push({ key: 'cat_' + uid('c'), label: { ar: ar || en, en: en || ar }, active, archived: false }); }
+          if (it) { it.label = { ar: ar || en, en: en || ar }; it.active = active; if (scoped) { if (projectId) it.projectId = projectId; else delete it.projectId; } }
+          else { Store.db.masterData[this.mdCat].push({ id: uid(this.mdCat), key: 'cat_' + uid('c'), label: { ar: ar || en, en: en || ar }, active, archived: false, projectId }); }
         } else {
           const data = {};
           catCfg.fields.forEach(f => { data[f.key] = m.el.querySelector(`#mdf-${f.key}`).value.trim(); });
           if (!data.name && !data.nameEn) return UI.toast(t('required'), 'err');
           data.active = active;
-          if (scoped) data.projectId = m.el.querySelector('#mdf-projectId').value || undefined;
+          if (scoped) data.projectId = projectId;
           if (it) { Object.assign(it, data); if (scoped && !data.projectId) delete it.projectId; }
           else { data.id = uid(this.mdCat); data.archived = false; if (this.mdCat === 'responsibleParties') data.key = uid('rp'); Store.db.masterData[this.mdCat].push(data); }
         }
@@ -414,7 +414,7 @@ const ModAdmin = {
 
     const mergeForm = (fromId) => {
       const others = this.mdRawItems(catCfg).filter(i => this.mdId(i) !== fromId);
-      const nameOf = i => catCfg.schema ? tl(i.label) : (LANG === 'ar' ? i.name : (i.nameEn || i.name));
+      const nameOf = i => catCfg.labelBased ? tl(i.label) : (LANG === 'ar' ? i.name : (i.nameEn || i.name));
       const m = UI.modal(`
         <div class="drawer-h"><h2>🔀 ${LANG === 'ar' ? 'دمج عنصر مكرر' : 'Merge duplicate'}</h2><button class="x-btn" data-close>✕</button></div>
         <div class="drawer-b">

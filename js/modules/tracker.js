@@ -206,7 +206,7 @@ const ModTracker = {
       </div>
       <div class="grid g3" style="margin-bottom:16px">
         <div class="panel"><div class="panel-h"><span>🗂</span><h3>${t('category')}</h3></div>
-          ${Charts.hbars((sch.categories || []).map(c => ({
+          ${Charts.hbars(Store.getMasterList('categories', { includeArchived: true }).map(c => ({
             label: tl(c.label), value: open.filter(r => r.category === c.key).length
           })).filter(x => x.value).sort((a, b2) => b2.value - a.value))}</div>
         <div class="panel"><div class="panel-h"><span>🌡</span><h3>${t('priority')}</h3></div>
@@ -284,7 +284,7 @@ const ModTracker = {
         <select class="input" id="tk-status"><option value="">${t('status')}: ${t('all')}</option>
           ${sch.statuses.map(s => `<option value="${s.key}" ${f.status === s.key ? 'selected' : ''}>${tl(s.label)}</option>`).join('')}</select>
         <select class="input" id="tk-cat"><option value="">${t('category')}: ${t('all')}</option>
-          ${sch.categories.map(c => `<option value="${c.key}" ${f.cat === c.key ? 'selected' : ''}>${tl(c.label)}</option>`).join('')}</select>
+          ${Store.getMasterList('categories', { includeArchived: true }).map(c => `<option value="${c.key}" ${f.cat === c.key ? 'selected' : ''}>${tl(c.label)}</option>`).join('')}</select>
         <select class="input" id="tk-party"><option value="">${TX('الجهة المسؤولة', 'Party')}: ${t('all')}</option>
           ${partyOpts.map(k => `<option value="${k}" ${f.party === k ? 'selected' : ''}>${UI.optLabel(k)}</option>`).join('')}</select>
         <select class="input" id="tk-con"><option value="">${t('contractor')}: ${t('all')}</option>
@@ -363,7 +363,7 @@ const ModTracker = {
     const closed = all.filter(r => r.status === 'closed');
     const buckets = [[0, 7], [8, 14], [15, 30], [31, 60], [61, 90], [91, 9999]];
     const sch = Store.schema('constraint');
-    const closeByCat = (sch.categories || []).map(c => {
+    const closeByCat = Store.getMasterList('categories', { includeArchived: true }).map(c => {
       const cls = closed.filter(r => r.category === c.key);
       return { label: tl(c.label), value: cls.length ? Math.round(cls.reduce((s, r) => s + this.daysOpen(r), 0) / cls.length) : 0 };
     }).filter(x => x.value).sort((a, b2) => b2.value - a.value);
@@ -496,7 +496,7 @@ const ModTracker = {
           <div class="full"><label class="fl">${tl(F('title').label)} <span class="req">*</span></label>${UI.fieldInput(F('title'), cur.title)}</div>
           <div class="full"><label class="fl">${tl(F('description').label)}</label>${UI.fieldInput(F('description'), cur.description)}</div>
           <div><label class="fl">${TX('التصنيف', 'Category')}</label>
-            <select class="input" data-fk="category" id="cr-cat"><option value="">—</option>${sch.categories.filter(c => !c.archived || cur.category === c.key).map(c => `<option value="${c.key}" ${cur.category === c.key ? 'selected' : ''}>${tl(c.label)}</option>`).join('')}
+            <select class="input" data-fk="category" id="cr-cat"><option value="">—</option>${Store.getMasterList('categories', { includeArchived: true }).filter(c => (c.active !== false && !c.archived) || cur.category === c.key).map(c => `<option value="${c.key}" ${cur.category === c.key ? 'selected' : ''}>${tl(c.label)}</option>`).join('')}
             <option value="__add">+ ${TX('إضافة فئة جديدة', 'Add new category')}</option></select></div>
           <div><label class="fl">${tl(F('subcategory').label)}</label><input class="input" data-fk="subcategory" list="dl-subcats-md" value="${esc(cur.subcategory || '')}"></div>
           <div><label class="fl">${tl(F('priority').label)}</label>${UI.fieldInput(F('priority'), cur.priority)}</div>
@@ -675,8 +675,7 @@ const ModTracker = {
         if (ar) {
           const en = prompt(TX('اسم الفئة (إنجليزي)', 'New category name (English)')) || ar;
           const key = 'cat_' + uid('c');
-          sch.categories.push({ key, label: { ar, en } });
-          Store.save();
+          Store.addToMasterList('categories', { key, label: { ar, en } }); // tagged to current project
           const opt = document.createElement('option'); opt.value = key; opt.textContent = LANG === 'ar' ? ar : en; opt.selected = true;
           catSel.insertBefore(opt, catSel.lastElementChild);
         } else catSel.value = cur.category || '';

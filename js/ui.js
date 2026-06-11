@@ -78,6 +78,11 @@ const UI = {
   },
 
   catLabel(type, key) {
+    if (type === 'constraint') {
+      const c = Store.getMasterList('categories', { includeArchived: true }).find(x => x.key === key)
+        || (Store.db.masterData.categories || []).find(x => x.key === key);
+      return c ? tl(c.label) : (key || '—');
+    }
     const c = (Store.schema(type).categories || []).find(x => x.key === key);
     return c ? tl(c.label) : (key || '—');
   },

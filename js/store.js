@@ -713,24 +713,9 @@ function seedDB() {
       ],
 
       // Classification Data
-      categories: [
-        { id: 'cat_u', key: 'utility', label: { ar: 'تعارض مرافق', en: 'Utility Conflict' }, active: true, archived: false },
-        { id: 'cat_cd', key: 'contractorDelay', label: { ar: 'تأخير مقاول', en: 'Contractor Delay' }, active: true, archived: false },
-        { id: 'cat_dd', key: 'developerDep', label: { ar: 'اعتمادية مطور', en: 'Developer Dependency' }, active: true, archived: false },
-        { id: 'cat_sp', key: 'siteProblem', label: { ar: 'مشكلة موقع', en: 'Site Problem' }, active: true, archived: false },
-        { id: 'cat_au', key: 'authority', label: { ar: 'جهات حكومية', en: 'Authorities' }, active: true, archived: false },
-        { id: 'cat_d', key: 'design', label: { ar: 'تصميم', en: 'Design' }, active: true, archived: false },
-        { id: 'cat_la', key: 'landAccess', label: { ar: 'أراضٍ/حرم طريق', en: 'Land/Right of Way' }, active: true, archived: false },
-        { id: 'cat_l', key: 'logistics', label: { ar: 'لوجستيات', en: 'Logistics' }, active: true, archived: false },
-        { id: 'cat_c', key: 'commercial', label: { ar: 'تجاري', en: 'Commercial' }, active: true, archived: false },
-        { id: 'cat_o', key: 'other', label: { ar: 'أخرى', en: 'Other' }, active: true, archived: false },
-      ],
-
-      subcategories: [
-        { id: 'sub1', name: 'كهرباء', active: true, archived: false },
-        { id: 'sub2', name: 'المياه', active: true, archived: false },
-        { id: 'sub3', name: 'الصرف', active: true, archived: false },
-      ],
+      // project-scoped lists — seeded per project (see seedScopedLists)
+      categories: [],
+      subcategories: [],
 
       departments: [
         { id: 'dept1', name: 'المشاريع', active: true, archived: false },
@@ -760,23 +745,53 @@ function seedDB() {
         { id: 'sev4', label: { ar: 'حرجة', en: 'Critical' }, key: 'critical', active: true, archived: false },
       ],
 
-      // Responsible Parties (managed list used by the issue "Responsible Party" field)
-      responsibleParties: [
-        { id: 'rp_contractor', key: 'contractor', name: 'المقاول', nameEn: 'Contractor', active: true, archived: false },
-        { id: 'rp_consultant', key: 'consultant', name: 'الاستشاري', nameEn: 'Consultant', active: true, archived: false },
-        { id: 'rp_developer', key: 'developer', name: 'المطور', nameEn: 'Developer', active: true, archived: false },
-        { id: 'rp_client', key: 'client', name: 'العميل', nameEn: 'Client', active: true, archived: false },
-        { id: 'rp_authority', key: 'authority', name: 'الجهات الحكومية', nameEn: 'Authority', active: true, archived: false },
-        { id: 'rp_internal', key: 'internal', name: 'فريق المشروع', nameEn: 'Internal Team', active: true, archived: false },
-        { id: 'rp_power', key: 'power', name: 'شركة الكهرباء', nameEn: 'Electricity Company', active: true, archived: false },
-        { id: 'rp_water', key: 'water', name: 'شركة المياه', nameEn: 'Water Company', active: true, archived: false },
-        { id: 'rp_telecom', key: 'telecom', name: 'شركة الاتصالات', nameEn: 'Telecom Company', active: true, archived: false },
-      ],
+      // project-scoped — seeded per project (see seedScopedLists)
+      responsibleParties: [],
     },
   };
   seedProjectParties(db);
+  db.projects.forEach(p => seedScopedListsFor(db, p.id));
   seedConstraintsFor(db);
   return db;
+}
+
+/* ---------- default templates for project-scoped lists ---------- */
+function defaultCategoriesTpl() {
+  return [
+    { key: 'utility', label: { ar: 'تعارض مرافق', en: 'Utility Conflict' } },
+    { key: 'contractorDelay', label: { ar: 'تأخير مقاول', en: 'Contractor Delay' } },
+    { key: 'developerDep', label: { ar: 'اعتمادية مطور', en: 'Developer Dependency' } },
+    { key: 'siteProblem', label: { ar: 'مشكلة موقع', en: 'Site Problem' } },
+    { key: 'authority', label: { ar: 'جهات حكومية', en: 'Authorities' } },
+    { key: 'design', label: { ar: 'تصميم', en: 'Design' } },
+    { key: 'landAccess', label: { ar: 'أراضٍ/حرم طريق', en: 'Land/Right of Way' } },
+    { key: 'logistics', label: { ar: 'لوجستيات', en: 'Logistics' } },
+    { key: 'commercial', label: { ar: 'تجاري', en: 'Commercial' } },
+    { key: 'other', label: { ar: 'أخرى', en: 'Other' } },
+  ];
+}
+function defaultSubcategoriesTpl() {
+  return [{ name: 'كهرباء' }, { name: 'المياه' }, { name: 'الصرف' }];
+}
+function defaultResponsiblePartiesTpl() {
+  return [
+    { key: 'contractor', name: 'المقاول', nameEn: 'Contractor' },
+    { key: 'consultant', name: 'الاستشاري', nameEn: 'Consultant' },
+    { key: 'developer', name: 'المطور', nameEn: 'Developer' },
+    { key: 'client', name: 'العميل', nameEn: 'Client' },
+    { key: 'authority', name: 'الجهات الحكومية', nameEn: 'Authority' },
+    { key: 'internal', name: 'فريق المشروع', nameEn: 'Internal Team' },
+    { key: 'power', name: 'شركة الكهرباء', nameEn: 'Electricity Company' },
+    { key: 'water', name: 'شركة المياه', nameEn: 'Water Company' },
+    { key: 'telecom', name: 'شركة الاتصالات', nameEn: 'Telecom Company' },
+  ];
+}
+// seed a project's own copy of the per-project lists (categories, subcategories, responsible parties)
+function seedScopedListsFor(db, projectId) {
+  const md = db.masterData;
+  defaultCategoriesTpl().forEach(c => md.categories.push({ id: uid('cat'), key: c.key, label: c.label, projectId, active: true, archived: false }));
+  defaultSubcategoriesTpl().forEach(s => md.subcategories.push({ id: uid('sub'), name: s.name, projectId, active: true, archived: false }));
+  defaultResponsiblePartiesTpl().forEach(r => md.responsibleParties.push({ id: uid('rp'), key: r.key, name: r.name, nameEn: r.nameEn, projectId, active: true, archived: false }));
 }
 
 /* ---------- seed: assign per-project parties (orgs + people) ---------- */
@@ -974,6 +989,25 @@ const Store = {
       csch.fields = csch.fields.filter(f => !['affectedZone', 'affectedStreet'].includes(f.key));
       if (csch.fields.length !== before) changed = true;
     }
+    // make categories / subcategories / responsible parties project-scoped (older databases had global copies)
+    const tplFor = { categories: defaultCategoriesTpl, subcategories: defaultSubcategoriesTpl, responsibleParties: defaultResponsiblePartiesTpl };
+    ['categories', 'subcategories', 'responsibleParties'].forEach(cat => {
+      const arr = this.db.masterData[cat] || (this.db.masterData[cat] = []);
+      const untagged = arr.filter(i => !i.projectId);
+      if (untagged.length) {
+        // replicate each shared item into every project, then drop the shared originals
+        this.db.projects.forEach(p => untagged.forEach(src => arr.push(Object.assign({}, src, { id: uid(cat.slice(0, 3)), projectId: p.id }))));
+        this.db.masterData[cat] = arr.filter(i => i.projectId);
+        changed = true;
+      }
+      // any project with no items of this list gets the defaults
+      this.db.projects.forEach(p => {
+        if (!this.db.masterData[cat].some(i => i.projectId === p.id)) {
+          tplFor[cat]().forEach(src => this.db.masterData[cat].push(Object.assign({ id: uid(cat.slice(0, 3)), active: true, archived: false }, src, { projectId: p.id })));
+          changed = true;
+        }
+      });
+    });
     if (changed) this.save();
   },
   save() { localStorage.setItem(DB_KEY, JSON.stringify(this.db)); },
@@ -998,7 +1032,9 @@ const Store = {
       id: 'p' + n,
       progress: 0, plannedProgress: 0, budget: 0, icon: '🏗️', milestones: [],
     }, data);
-    this.db.projects.push(p); this.save();
+    this.db.projects.push(p);
+    seedScopedListsFor(this.db, p.id); // give the new project its own categories / subcategories / responsible parties
+    this.save();
     return p;
   },
   updateProject(id, patch) {
@@ -1147,7 +1183,7 @@ const Store = {
   },
 
   // categories whose items belong to a specific project (vs. shared across all)
-  PROJECT_SCOPED: ['people', 'organizations', 'zones', 'streets', 'subcategories'],
+  PROJECT_SCOPED: ['people', 'organizations', 'zones', 'streets', 'subcategories', 'categories', 'responsibleParties'],
 
   // Master Data - Enhanced Queries (project-aware)
   getMasterList(category, opts = {}) {
@@ -1197,18 +1233,16 @@ const Store = {
     return this.getMasterList('people', { projectId });
   },
 
-  // responsible-party label from its stored key
+  // responsible-party label from its stored key (current project first, then any)
   respPartyLabel(key) {
-    const it = (this.db.masterData.responsibleParties || []).find(x => x.key === key || x.id === key);
+    const scoped = this.getMasterList('responsibleParties', { includeArchived: true }).find(x => x.key === key || x.id === key);
+    const it = scoped || (this.db.masterData.responsibleParties || []).find(x => x.key === key || x.id === key);
     return it ? (LANG === 'ar' ? it.name : (it.nameEn || it.name)) : key;
   },
 
-  // delete a master-data / schema-category item
+  // delete a master-data item
   deleteMasterItem(category, id) {
-    if (category === 'categories') {
-      const cats = this.db.schemas.constraint.categories || [];
-      this.db.schemas.constraint.categories = cats.filter(c => c.key !== id);
-    } else if (this.db.masterData[category]) {
+    if (this.db.masterData[category]) {
       this.db.masterData[category] = this.db.masterData[category].filter(i => i.id !== id);
     }
     this.save();
@@ -1222,7 +1256,7 @@ const Store = {
     const nameOf = (arr, id, k) => { const it = (arr || []).find(x => x.id === id); return it ? (k === 'key' ? it.key : it.name) : id; };
     let fromVal, toVal, fields;
     if (category === 'categories') {
-      fromVal = fromId; toVal = toId; fields = ['category'];
+      fromVal = nameOf(md.categories, fromId, 'key'); toVal = nameOf(md.categories, toId, 'key'); fields = ['category'];
     } else if (category === 'responsibleParties') {
       fromVal = nameOf(md.responsibleParties, fromId, 'key'); toVal = nameOf(md.responsibleParties, toId, 'key'); fields = ['responsibleParty'];
     } else if (category === 'organizations') {

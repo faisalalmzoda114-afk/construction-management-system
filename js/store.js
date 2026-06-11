@@ -1021,7 +1021,11 @@ const Store = {
 
   contractor(id) { return this.db.contractors.find(c => c.id === id); },
   userById(id) { return this.db.users.find(u => u.id === id); },
-  userName(id) { const u = this.userById(id); return u ? (LANG === 'ar' ? u.name : u.nameEn) : '—'; },
+  userName(id) {
+    const u = this.userById(id); if (u) return LANG === 'ar' ? u.name : u.nameEn;
+    if (id) { const p = this.getPerson(id); if (p) return LANG === 'ar' ? p.name : (p.nameEn || p.name); }
+    return id || '—';
+  },
 
   // helpers
   daysOver(rec, field = 'dueDate') {

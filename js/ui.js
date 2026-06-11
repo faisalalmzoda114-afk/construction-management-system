@@ -208,7 +208,11 @@ const UI = {
     switch (f.type) {
       case 'date': return UI.fmtDate(v);
       case 'user': return `${UI.avatar(v)} ${esc(Store.userName(v))}`;
-      case 'contractor': { const c = Store.contractor(v); return c ? `${c.icon} ${esc(LANG === 'ar' ? c.name : c.nameEn)}` : '—'; }
+      case 'contractor': {
+        const c = Store.contractor(v); if (c) return `${c.icon} ${esc(LANG === 'ar' ? c.name : c.nameEn)}`;
+        const o = Store.getOrganization(v); if (o) return esc(LANG === 'ar' ? o.name : (o.nameEn || o.name));
+        return esc(v);
+      }
       case 'tags': return v.map(x => `<span class="tag">${esc(x)}</span>`).join(' ');
       case 'attachments': return v.map(a => `<span class="tag">📎 ${esc(a.name)}</span>`).join(' ');
       case 'priority': return UI.prioChip(v);

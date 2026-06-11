@@ -14,6 +14,7 @@ const ModAdmin = {
       ['fields', '🔠', t('adminFields')],
       ['statuses', '🏷', t('adminStatuses')],
       ['categories', '🗂', t('adminCategories')],
+      ['masterData', '🗄', LANG === 'ar' ? 'مركز البيانات الرئيسية' : 'Master Data Center'],
       ['users', '👥', t('adminUsers')],
       ['roles', '🔐', t('adminRoles')],
       ['general', '⚙️', t('adminGeneral')],
@@ -228,6 +229,139 @@ const ModAdmin = {
       if (v) { sch.tags.push(v); Store.save(); rr(); }
     };
     body.querySelectorAll('[data-trm]').forEach(b => b.onclick = () => { sch.tags.splice(+b.dataset.trm, 1); Store.save(); rr(); });
+  },
+
+  /* ---------- master data center ---------- */
+  mdCat: 'people',
+  mdCategories: [
+    { key: 'people', icon: '🧑‍💼', label: () => LANG === 'ar' ? 'الأشخاص' : 'People', fields: [
+      { key: 'name', label: () => LANG === 'ar' ? 'الاسم (عربي)' : 'Name (AR)' },
+      { key: 'nameEn', label: () => 'Name (EN)' },
+      { key: 'company', label: () => LANG === 'ar' ? 'الجهة' : 'Organization', type: 'org' },
+      { key: 'position', label: () => LANG === 'ar' ? 'المسمى الوظيفي' : 'Position' },
+      { key: 'department', label: () => LANG === 'ar' ? 'القسم' : 'Department' },
+      { key: 'discipline', label: () => LANG === 'ar' ? 'التخصص' : 'Discipline' },
+      { key: 'email', label: () => 'Email' },
+      { key: 'mobile', label: () => LANG === 'ar' ? 'الجوال' : 'Mobile' },
+    ] },
+    { key: 'organizations', icon: '🏢', label: () => LANG === 'ar' ? 'الجهات / الشركات' : 'Organizations', fields: [
+      { key: 'type', label: () => LANG === 'ar' ? 'النوع' : 'Type', type: 'orgtype' },
+      { key: 'name', label: () => LANG === 'ar' ? 'الاسم (عربي)' : 'Name (AR)' },
+      { key: 'nameEn', label: () => 'Name (EN)' },
+      { key: 'contactPerson', label: () => LANG === 'ar' ? 'مسؤول التواصل' : 'Contact Person' },
+      { key: 'email', label: () => 'Email' },
+      { key: 'mobile', label: () => LANG === 'ar' ? 'الجوال' : 'Mobile' },
+      { key: 'notes', label: () => LANG === 'ar' ? 'ملاحظات' : 'Notes' },
+    ] },
+    { key: 'zones', icon: '📍', label: () => LANG === 'ar' ? 'المناطق' : 'Zones', fields: [
+      { key: 'name', label: () => LANG === 'ar' ? 'الاسم (عربي)' : 'Name (AR)' },
+      { key: 'nameEn', label: () => 'Name (EN)' },
+    ] },
+    { key: 'streets', icon: '🛣', label: () => LANG === 'ar' ? 'الشوارع' : 'Streets', fields: [
+      { key: 'name', label: () => LANG === 'ar' ? 'الاسم (عربي)' : 'Name (AR)' },
+      { key: 'nameEn', label: () => 'Name (EN)' },
+      { key: 'zone', label: () => LANG === 'ar' ? 'المنطقة' : 'Zone', type: 'zone' },
+    ] },
+    { key: 'subcategories', icon: '🗃', label: () => LANG === 'ar' ? 'الفئات الفرعية' : 'Subcategories', fields: [
+      { key: 'name', label: () => LANG === 'ar' ? 'الاسم (عربي)' : 'Name (AR)' },
+      { key: 'nameEn', label: () => 'Name (EN)' },
+    ] },
+    { key: 'departments', icon: '🏬', label: () => LANG === 'ar' ? 'الأقسام' : 'Departments', fields: [
+      { key: 'name', label: () => LANG === 'ar' ? 'الاسم (عربي)' : 'Name (AR)' },
+      { key: 'nameEn', label: () => 'Name (EN)' },
+    ] },
+    { key: 'disciplines', icon: '🔧', label: () => LANG === 'ar' ? 'التخصصات' : 'Disciplines', fields: [
+      { key: 'name', label: () => LANG === 'ar' ? 'الاسم (عربي)' : 'Name (AR)' },
+      { key: 'nameEn', label: () => 'Name (EN)' },
+    ] },
+  ],
+  orgTypeOptions: [
+    { key: 'contractor', ar: 'مقاول', en: 'Contractor' }, { key: 'consultant', ar: 'استشاري', en: 'Consultant' },
+    { key: 'developer', ar: 'مطور', en: 'Developer' }, { key: 'client', ar: 'عميل', en: 'Client' },
+    { key: 'owner', ar: 'مالك', en: 'Owner' }, { key: 'authority', ar: 'جهة حكومية', en: 'Authority' },
+    { key: 'utility', ar: 'مزود خدمة', en: 'Utility Provider' }, { key: 'other', ar: 'أخرى', en: 'Other' },
+  ],
+  mdFieldDisplay(f, it) {
+    const v = it[f.key];
+    if (!v) return '—';
+    if (f.type === 'org') { const o = Store.getOrganization(v); return o ? (LANG === 'ar' ? o.name : (o.nameEn || o.name)) : v; }
+    if (f.type === 'zone') { const z = (Store.db.masterData.zones || []).find(z2 => z2.id === v); return z ? (LANG === 'ar' ? z.name : (z.nameEn || z.name)) : v; }
+    if (f.type === 'orgtype') { const o = this.orgTypeOptions.find(o2 => o2.key === v); return o ? (LANG === 'ar' ? o.ar : o.en) : v; }
+    return v;
+  },
+  mdFieldInput(f, val) {
+    if (f.type === 'org') {
+      const orgs = Store.getMasterList('organizations', { onlyActive: false });
+      return `<select class="input" id="mdf-${f.key}"><option value="">—</option>${orgs.map(o => `<option value="${o.id}" ${val === o.id ? 'selected' : ''}>${esc(LANG === 'ar' ? o.name : (o.nameEn || o.name))}</option>`).join('')}</select>`;
+    }
+    if (f.type === 'zone') {
+      const zones = Store.getMasterList('zones', { onlyActive: false });
+      return `<select class="input" id="mdf-${f.key}"><option value="">—</option>${zones.map(z => `<option value="${z.id}" ${val === z.id ? 'selected' : ''}>${esc(LANG === 'ar' ? z.name : (z.nameEn || z.name))}</option>`).join('')}</select>`;
+    }
+    if (f.type === 'orgtype') {
+      return `<select class="input" id="mdf-${f.key}">${this.orgTypeOptions.map(o => `<option value="${o.key}" ${val === o.key ? 'selected' : ''}>${esc(LANG === 'ar' ? o.ar : o.en)}</option>`).join('')}</select>`;
+    }
+    return `<input class="input" id="mdf-${f.key}" value="${esc(val || '')}">`;
+  },
+  masterData(body, rr) {
+    this.mdCat = this.mdCat || 'people';
+    const catCfg = this.mdCategories.find(c => c.key === this.mdCat);
+    const items = Store.getMasterList(this.mdCat, { includeArchived: true });
+    body.innerHTML = `
+      <div style="display:grid;grid-template-columns:220px 1fr;gap:16px;align-items:start">
+        <div class="panel">
+          <div class="panel-h"><h3>🗄 ${LANG === 'ar' ? 'البيانات الرئيسية' : 'Master Data'}</h3></div>
+          <div class="flex" style="flex-direction:column;gap:6px">
+            ${this.mdCategories.map(c => `<button class="btn sm ${this.mdCat === c.key ? 'primary' : ''}" data-mdc="${c.key}" style="justify-content:flex-start">${c.icon} ${c.label()}</button>`).join('')}
+          </div>
+        </div>
+        <div class="panel" style="overflow-x:auto">
+          <div class="panel-h"><h3>${catCfg.icon} ${catCfg.label()}</h3><div class="spacer"></div><button class="btn primary sm" id="md-add">＋ ${t('add')}</button></div>
+          <table class="tbl"><thead><tr>${catCfg.fields.map(f => `<th>${f.label()}</th>`).join('')}<th>${LANG === 'ar' ? 'الحالة' : 'Status'}</th><th></th></tr></thead><tbody>
+          ${items.map(it => `<tr style="${it.archived ? 'opacity:.5' : ''}">
+            ${catCfg.fields.map(f => `<td class="fs12">${esc(this.mdFieldDisplay(f, it))}</td>`).join('')}
+            <td>${it.archived ? `<span class="tag">${LANG === 'ar' ? 'مؤرشف' : 'archived'}</span>` : (it.active === false ? `<span class="tag">${LANG === 'ar' ? 'غير نشط' : 'inactive'}</span>` : `<span class="tag" style="background:rgba(52,211,153,.15);color:#34d399">${LANG === 'ar' ? 'نشط' : 'active'}</span>`)}</td>
+            <td style="white-space:nowrap">
+              <button class="btn sm" data-mded="${it.id}">✏️</button>
+              <button class="btn sm" data-mdarc="${it.id}">${it.archived ? '♻️' : '🗄'}</button>
+              <button class="btn sm danger" data-mdrm="${it.id}">🗑</button>
+            </td></tr>`).join('') || `<tr><td colspan="${catCfg.fields.length + 2}">${UI.empty('🗄')}</td></tr>`}
+          </tbody></table>
+          <div class="fs11 mut mt8">${LANG === 'ar' ? 'العناصر المؤرشفة تبقى مرتبطة بالسجلات القديمة لكنها تختفي من القوائم الجديدة.' : 'Archived items stay linked to old records but are hidden from new dropdowns.'}</div>
+        </div>
+      </div>`;
+    body.querySelectorAll('[data-mdc]').forEach(b => b.onclick = () => { this.mdCat = b.dataset.mdc; rr(); });
+
+    const itemForm = (it) => {
+      const m = UI.modal(`
+        <div class="drawer-h"><h2>${it ? '✏️' : '＋'} ${catCfg.label()}</h2><button class="x-btn" data-close>✕</button></div>
+        <div class="drawer-b"><div class="form-grid">
+          ${catCfg.fields.map(f => `<div><label class="fl">${f.label()}</label>${this.mdFieldInput(f, it ? it[f.key] : '')}</div>`).join('')}
+          <div><label class="fl">${LANG === 'ar' ? 'نشط' : 'Active'}</label><select class="input" id="mdf-active">
+            <option value="1" ${!it || it.active !== false ? 'selected' : ''}>${t('yes')}</option>
+            <option value="0" ${it && it.active === false ? 'selected' : ''}>${t('no')}</option></select></div>
+        </div></div>
+        <div class="drawer-f"><button class="btn primary" id="mdf-save">💾 ${t('save')}</button></div>`);
+      m.el.querySelector('#mdf-save').onclick = () => {
+        const data = {};
+        catCfg.fields.forEach(f => { data[f.key] = m.el.querySelector(`#mdf-${f.key}`).value.trim(); });
+        if (!data.name && !data.nameEn) return UI.toast(t('required'), 'err');
+        data.active = m.el.querySelector('#mdf-active').value === '1';
+        if (it) { Object.assign(it, data); }
+        else { data.id = uid(this.mdCat); data.archived = false; Store.db.masterData[this.mdCat].push(data); }
+        Store.save(); m.close(); UI.toast(t('saved')); rr();
+      };
+    };
+    body.querySelector('#md-add').onclick = () => itemForm(null);
+    body.querySelectorAll('[data-mded]').forEach(b => b.onclick = () => itemForm(items.find(i => i.id === b.dataset.mded)));
+    body.querySelectorAll('[data-mdarc]').forEach(b => b.onclick = () => {
+      const it = items.find(i => i.id === b.dataset.mdarc);
+      it.archived = !it.archived; Store.save(); rr();
+    });
+    body.querySelectorAll('[data-mdrm]').forEach(b => b.onclick = () => UI.confirm(t('confirmDelete'), () => {
+      Store.db.masterData[this.mdCat] = Store.db.masterData[this.mdCat].filter(i => i.id !== b.dataset.mdrm);
+      Store.save(); rr();
+    }));
   },
 
   /* ---------- users ---------- */

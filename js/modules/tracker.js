@@ -425,9 +425,22 @@ const ModTracker = {
     const consultants = orgs.filter(o => o.type === 'consultant');
     const developers = orgs.filter(o => o.type === 'developer');
     const clients = orgs.filter(o => o.type === 'client' || o.type === 'owner');
+    const contractorOrgs = orgs.filter(o => o.type === 'contractor');
     const zones = Store.getMasterList('zones');
     const streets = Store.getMasterList('streets');
     const subcats = Store.getMasterList('subcategories');
+    const personDisplay = v => {
+      if (!v) return '';
+      const u = Store.userById(v); if (u) return LANG === 'ar' ? u.name : (u.nameEn || u.name);
+      const p = Store.getPerson(v); if (p) return lbl(p);
+      return v;
+    };
+    const contractorDisplay = v => {
+      if (!v) return '';
+      const c = Store.contractor(v); if (c) return LANG === 'ar' ? c.name : (c.nameEn || c.name);
+      const o = Store.getOrganization(v); if (o) return lbl(o);
+      return v;
+    };
 
     const dl = (id, items) => `<datalist id="${id}">${items.map(i => `<option value="${esc(lbl(i))}">`).join('')}</datalist>`;
     const streetOptions = (zoneName, selected) => {
@@ -451,7 +464,7 @@ const ModTracker = {
       <div class="drawer-h"><h2>${rec ? '✏️ ' + t('edit') : '🚩 ＋ ' + TX('معوق / مشكلة جديدة', 'New Issue / Constraint')} ${rec ? `<span class="mut fs12">${esc(rec.ref)}</span>` : ''}</h2>
         <button class="x-btn" data-close>✕</button></div>
       <div class="drawer-b">
-        ${dl('dl-people', people)}${dl('dl-orgs', orgs)}${dl('dl-consultants', consultants)}${dl('dl-developers', developers)}${dl('dl-clients', clients)}${dl('dl-zones', zones)}${dl('dl-streets', streets)}${dl('dl-subcats', subcats)}
+        ${dl('dl-people', people.concat(Store.db.users))}${dl('dl-orgs', orgs)}${dl('dl-consultants', consultants)}${dl('dl-developers', developers)}${dl('dl-clients', clients)}${dl('dl-zones', zones)}${dl('dl-streets', streets)}${dl('dl-subcats', subcats)}${dl('dl-contractors', contractorOrgs.concat(Store.db.contractors))}
 
         <div class="panel" style="margin-bottom:14px">
           <div class="grid g4">
@@ -477,7 +490,8 @@ const ModTracker = {
             <div class="fs11 mut mt8" id="ai-next-out"></div>
           </div>
           <div><label class="fl">${TX('التصنيف', 'Category')}</label>
-            <select class="input" data-fk="category" id="cr-cat"><option value="">—</option>${sch.categories.map(c => `<option value="${c.key}" ${cur.category === c.key ? 'selected' : ''}>${tl(c.label)}</option>`).join('')}</select></div>
+            <select class="input" data-fk="category" id="cr-cat"><option value="">—</option>${sch.categories.map(c => `<option value="${c.key}" ${cur.category === c.key ? 'selected' : ''}>${tl(c.label)}</option>`).join('')}
+            <option value="__add">+ ${TX('إضافة فئة جديدة', 'Add new category')}</option></select></div>
           <div><label class="fl">${tl(F('subcategory').label)}</label><input class="input" data-fk="subcategory" list="dl-subcats" value="${esc(cur.subcategory || '')}"></div>
           <div><label class="fl">${tl(F('priority').label)}</label>${UI.fieldInput(F('priority'), cur.priority)}</div>
           <div><label class="fl">${tl(F('severity').label)}</label>${UI.fieldInput(F('severity'), cur.severity)}</div>
@@ -500,9 +514,9 @@ const ModTracker = {
         <div class="section-t">👥 ${TX('مصفوفة المسؤولية', 'Responsibility Matrix')}</div>
         <div class="form-grid">
           <div><label class="fl">${tl(F('responsibleParty').label)} <span class="req">*</span></label>${UI.fieldInput(F('responsibleParty'), cur.responsibleParty)}</div>
-          <div><label class="fl">${tl(F('currentOwner').label)} <span class="req">*</span></label>${UI.fieldInput(F('currentOwner'), cur.currentOwner || Store.db.currentUserId)}</div>
-          <div><label class="fl">${tl(F('assignedTo').label)}</label>${UI.fieldInput(F('assignedTo'), cur.assignedTo)}</div>
-          <div><label class="fl">${tl(F('raisedBy').label)}</label>${UI.fieldInput(F('raisedBy'), cur.raisedBy || Store.db.currentUserId)}</div>
+          <div><label class="fl">${tl(F('currentOwner').label)} <span class="req">*</span></label><input class="input" data-fk="currentOwner" list="dl-people" placeholder="${TX('اكتب اسماً أو اختر من القائمة', 'Type a name or pick from the list')}" value="${esc(personDisplay(cur.currentOwner || Store.db.currentUserId))}"></div>
+          <div><label class="fl">${tl(F('assignedTo').label)}</label><input class="input" data-fk="assignedTo" list="dl-people" placeholder="${TX('اكتب اسماً أو اختر من القائمة', 'Type a name or pick from the list')}" value="${esc(personDisplay(cur.assignedTo))}"></div>
+          <div><label class="fl">${tl(F('raisedBy').label)}</label><input class="input" data-fk="raisedBy" list="dl-people" placeholder="${TX('اكتب اسماً أو اختر من القائمة', 'Type a name or pick from the list')}" value="${esc(personDisplay(cur.raisedBy || Store.db.currentUserId))}"></div>
           <div><label class="fl">${tl(F('reviewer').label)}</label><input class="input" data-fk="reviewer" list="dl-people" value="${esc(cur.reviewer || '')}"></div>
           <div><label class="fl">${tl(F('approver').label)}</label><input class="input" data-fk="approver" list="dl-people" value="${esc(cur.approver || '')}"></div>
           <div><label class="fl">${tl(F('watchers').label)}</label><input class="input" data-fk="watchers" list="dl-people" placeholder="${TX('افصل بفاصلة', 'comma separated')}" value="${esc((cur.watchers || []).join(', '))}"></div>
@@ -512,7 +526,7 @@ const ModTracker = {
 
         <div class="section-t">⚠️ ${TX('قسم التأثير', 'Impact Section')}</div>
         <div class="form-grid">
-          <div><label class="fl">${tl(F('contractor').label)}</label>${UI.fieldInput(F('contractor'), cur.contractor)}</div>
+          <div><label class="fl">${tl(F('contractor').label)}</label><input class="input" data-fk="contractor" list="dl-contractors" placeholder="${TX('اكتب اسماً أو اختر من القائمة', 'Type a name or pick from the list')}" value="${esc(contractorDisplay(cur.contractor))}"></div>
           <div><label class="fl">${tl(F('consultant').label)}</label><input class="input" data-fk="consultant" list="dl-consultants" value="${esc(cur.consultant || '')}"></div>
           <div><label class="fl">${tl(F('developer').label)}</label><input class="input" data-fk="developer" list="dl-developers" value="${esc(cur.developer || '')}"></div>
           <div><label class="fl">${tl(F('clientParty').label)}</label><input class="input" data-fk="clientParty" list="dl-clients" value="${esc(cur.clientParty || '')}"></div>
@@ -610,6 +624,22 @@ const ModTracker = {
           const opt = document.createElement('option'); opt.value = nm; opt.textContent = nm; opt.selected = true;
           streetSel.insertBefore(opt, streetSel.lastElementChild);
         } else streetSel.value = '';
+      }
+    };
+
+    /* ---- inline category creation ---- */
+    const catSel = m.el.querySelector('#cr-cat');
+    catSel.onchange = () => {
+      if (catSel.value === '__add') {
+        const ar = prompt(TX('اسم الفئة الجديدة (عربي)', 'New category name (Arabic)'));
+        if (ar) {
+          const en = prompt(TX('اسم الفئة (إنجليزي)', 'New category name (English)')) || ar;
+          const key = 'cat_' + uid('c');
+          sch.categories.push({ key, label: { ar, en } });
+          Store.save();
+          const opt = document.createElement('option'); opt.value = key; opt.textContent = LANG === 'ar' ? ar : en; opt.selected = true;
+          catSel.insertBefore(opt, catSel.lastElementChild);
+        } else catSel.value = cur.category || '';
       }
     };
 
@@ -766,6 +796,24 @@ const ModTracker = {
       if (statusInp && statusOverride) statusInp.value = statusOverride;
       const data = UI.collectForm(m.el, 'constraint');
       if (!data) return;
+
+      /* auto-register free-typed names/companies into master data for future suggestions */
+      const sameName = (it, v) => (it.name === v) || (it.nameEn === v) || (LANG === 'ar' ? it.name : it.nameEn) === v;
+      ['currentOwner', 'assignedTo', 'raisedBy'].forEach(k => {
+        const v = (data[k] || '').trim();
+        if (!v) return;
+        if (Store.userById(v) || Store.getPerson(v)) return;
+        if (Store.db.users.some(u => sameName(u, v)) || people.some(p => sameName(p, v))) return;
+        const created = Store.addToMasterList('people', { name: v, nameEn: v, active: true });
+        people.push(created);
+      });
+      const cv = (data.contractor || '').trim();
+      if (cv && !Store.contractor(cv) && !Store.getOrganization(cv)) {
+        if (!Store.db.contractors.some(c => sameName(c, cv)) && !orgs.some(o => sameName(o, cv))) {
+          const created = Store.addToMasterList('organizations', { type: 'contractor', name: cv, nameEn: cv, active: true });
+          orgs.push(created);
+        }
+      }
 
       if (rec) {
         if (data.dueDate !== rec.dueDate) Store.logTL('constraint', rec.id, 'due', { oldVal: rec.dueDate, newVal: data.dueDate });

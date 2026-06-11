@@ -1310,11 +1310,25 @@ const Store = {
     this.scheduleAudit(fileId, 'deleted', TX('حذف الملف نهائياً', 'File permanently deleted'));
     this.save();
   },
-  scheduleAudit(fileId, action, notes = '') {
-    this.db.schedule.audit.push({
+  scheduleAudit(fileId, action, notes = '', extra = {}) {
+    this.db.schedule.audit.push(Object.assign({
       id: uid('saud'), projectId: this.db.currentProjectId, fileId, action, notes,
       by: this.db.currentUserId, at: new Date().toISOString(),
+    }, extra));
+  },
+  // field-level activity edit with full old/new audit trail
+  updateScheduleActivity(id, patch) {
+    const a = this.db.schedule.activities.find(x => x.id === id); if (!a) return null;
+    const fmt = v => v == null ? '' : (typeof v === 'object' ? JSON.stringify(v) : String(v));
+    Object.keys(patch).forEach(k => {
+      if (fmt(a[k]) === fmt(patch[k])) return;
+      this.scheduleAudit(a.fileId, 'edited', '', {
+        activityId: a.id, activityCode: a.activityId, activityName: a.name,
+        field: k, oldVal: fmt(a[k]), newVal: fmt(patch[k]),
+      });
+      a[k] = patch[k];
     });
+    this.save(); return a;
   },
   scheduleAuditLog(projectId) {
     const pid = projectId || this.db.currentProjectId;

@@ -386,7 +386,44 @@ const ModSchedule = {
       .sch-mapwrap svg circle{cursor:pointer}
       .sch-lane{border:1px solid var(--bd);border-radius:10px;background:var(--bg2);padding:10px;min-height:120px}
       .sch-card{border:1px solid var(--bd);border-radius:8px;padding:7px 10px;margin-bottom:6px;font-size:12px;background:var(--bg);cursor:pointer}
-      .sch-card:hover{border-color:var(--accent)}`;
+      .sch-card:hover{border-color:var(--accent)}
+      /* ---- Primavera viewer ---- */
+      .p6-wrap{display:flex;gap:8px}
+      .p6-tree{flex:0 0 220px;max-width:220px;border:1px solid var(--bd);border-radius:8px;background:var(--bg2);max-height:74vh;overflow:auto;padding:6px}
+      .p6-tnode{font-size:12px;border-radius:6px}
+      .p6-tnode .p6-tlabel{display:flex;gap:5px;align-items:center;padding:5px 6px;cursor:pointer;border-radius:6px;white-space:nowrap}
+      .p6-tnode .p6-tlabel:hover{background:var(--bg)}
+      .p6-tnode.sel>.p6-tlabel{background:var(--accent);color:#fff}
+      .p6-tnode .p6-tkids{margin-inline-start:12px;border-inline-start:1px dashed var(--bd);padding-inline-start:4px}
+      .p6-tcount{margin-inline-start:auto;font-size:10px;opacity:.7}
+      .p6-grid{flex:1;min-width:0;border:1px solid var(--bd);border-radius:8px;overflow:auto;max-height:74vh;position:relative;background:var(--bg2)}
+      .p6-inner{display:flex;min-width:max-content;position:relative}
+      .p6-tbl{position:sticky;inset-inline-start:0;z-index:6;background:var(--bg2);border-inline-end:2px solid var(--bd)}
+      .p6-thead,.p6-ghead{height:44px;position:sticky;top:0;z-index:4;background:var(--bg);border-bottom:2px solid var(--bd);font-size:10px;font-weight:700;color:var(--txt-3);white-space:nowrap}
+      .p6-tbl .p6-thead{z-index:7}
+      .p6-th{display:flex;align-items:center}
+      .p6-th>div{padding:0 6px;border-inline-end:1px solid var(--bd);line-height:44px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+      .p6-trow{display:flex;align-items:center;height:26px;border-bottom:1px solid var(--line);font-size:11px;cursor:pointer}
+      .p6-trow:hover{background:var(--bg)}
+      .p6-trow.sum{background:var(--bg);font-weight:700}
+      .p6-trow>div{padding:0 6px;border-inline-end:1px solid var(--line);overflow:hidden;white-space:nowrap;text-overflow:ellipsis;line-height:26px}
+      .p6-twist{cursor:pointer;display:inline-block;width:12px;transition:.15s;flex:0 0 12px;text-align:center}
+      .p6-twist.open{transform:rotate(90deg)}
+      .p6-gbody{position:relative}
+      .p6-bar{position:absolute;height:11px;border-radius:2px;box-shadow:inset 0 0 0 1px rgba(0,0,0,.15)}
+      .p6-bar .pf{display:block;height:100%;border-radius:2px 0 0 2px;background:rgba(255,255,255,.5)}
+      .p6-bl{position:absolute;height:4px;border-radius:2px;background:#64748b;opacity:.75}
+      .p6-sum{position:absolute;height:7px;background:#1e293b;border-radius:1px}
+      .p6-sum::before,.p6-sum::after{content:'';position:absolute;bottom:-3px;border:5px solid transparent;border-top-color:#1e293b}
+      .p6-sum::before{inset-inline-start:0}.p6-sum::after{inset-inline-end:0}
+      html[data-theme] .p6-sum,.p6-sum{background:var(--txt-2)}
+      .p6-ms{position:absolute;width:12px;height:12px;background:#0f172a;transform:rotate(45deg)}
+      .p6-mscrit{background:#ef4444}
+      .p6-today{position:absolute;top:0;bottom:0;width:2px;background:#f87171;z-index:3}
+      .p6-gm{display:inline-block;border-inline-end:1px solid var(--bd);text-align:center;overflow:hidden;white-space:nowrap;vertical-align:top}
+      .p6-rel{position:absolute;inset:0;pointer-events:none;z-index:2;overflow:visible}
+      .p6-legend{display:flex;gap:12px;flex-wrap:wrap;font-size:10px;margin:6px 2px}
+      .p6-legend i{display:inline-block;width:16px;height:8px;border-radius:2px;vertical-align:middle;margin-inline-end:3px}`;
     document.head.appendChild(st);
   },
 
@@ -396,9 +433,8 @@ const ModSchedule = {
     const file = Store.currentScheduleFile();
     if (file) this.ensureDefaults(Store.scheduleActivities(file.id));
     Engine.modulePage(container, 'schedule', [
-      { key: 'dash', icon: '🎯', label: TX('اللوحة التنفيذية', 'Executive'), render: (b, rr) => this.dashboard(b, rr) },
-      { key: 'explorer', icon: '🗂', label: TX('هيكل المشروع', 'Project Explorer'), render: (b, rr) => this.explorerView(b, rr) },
-      { key: 'gantt', icon: '📅', label: TX('مخطط جانت', 'Gantt'), render: (b, rr) => this.ganttView(b, rr) },
+      { key: 'p6', icon: '📊', label: TX('عارض Primavera', 'Primavera Viewer'), render: (b, rr) => this.p6View(b, rr) },
+      { key: 'explorer', icon: '🗂', label: TX('هيكل المشروع', 'WBS Explorer'), render: (b, rr) => this.explorerView(b, rr) },
       { key: 'delay', icon: '⏰', label: TX('تحليل التأخير', 'Delay Analysis'), render: (b, rr) => this.delayView(b, rr) },
       { key: 'critical', icon: '🔥', label: TX('المسار الحرج', 'Critical Path'), render: (b, rr) => this.criticalView(b, rr) },
       { key: 'baseline', icon: '🎯', label: TX('مقارنة Baseline', 'Baseline vs Current'), render: (b, rr) => this.baselineView(b, rr) },
@@ -408,10 +444,263 @@ const ModSchedule = {
       { key: 'timeline', icon: '🧭', label: TX('الخط الزمني', 'Timeline'), render: (b, rr) => this.timelineView(b, rr) },
       { key: 'boards', icon: '🏗️', label: TX('المقاولون والمناطق', 'Contractors & Zones'), render: (b, rr) => this.boardsView(b, rr) },
       { key: 'map', icon: '🗺️', label: TX('الخريطة', 'Map'), render: (b, rr) => this.mapView(b, rr) },
+      { key: 'dash', icon: '📋', label: TX('ملخص تنفيذي', 'Executive Summary'), render: (b, rr) => this.dashboard(b, rr) },
       { key: 'files', icon: '📁', label: TX('الملفات والإصدارات', 'Files & Versions'), render: (b, rr) => this.filesView(b, rr) },
       { key: 'snapshots', icon: '🕓', label: TX('اللقطات', 'Snapshots'), render: (b, rr) => this.snapshotsView(b, rr) },
     ]);
     Store.ensureWeeklySnapshot();
+  },
+
+  /* ================= Primavera P6-style viewer ================= */
+  p6State() {
+    if (!this._p6) this._p6 = { collapsed: new Set(), sel: '', q: '', zone: '', street: '', contractor: '', consultant: '', system: '', status: '', showRel: true, treeQ: '' };
+    return this._p6;
+  },
+  p6Color(a) {
+    if (this.isComplete(a)) return '#22c55e';
+    if (this.isDelayed(a)) return '#f59e0b';
+    if (a.critical) return '#ef4444';
+    if (this.statusKey(a) === 'progress') return '#3b82f6';
+    return '#94a3b8';
+  },
+  p6Filtered(acts) {
+    const f = this.p6State();
+    return acts.filter(a => {
+      if (f.zone && a.zone !== f.zone) return false;
+      if (f.street && a.street !== f.street) return false;
+      if (f.contractor && a.contractor !== f.contractor) return false;
+      if (f.consultant && a.consultant !== f.consultant) return false;
+      if (f.system && a.system !== f.system) return false;
+      if (f.status === 'critical' && !(a.critical && !this.isComplete(a))) return false;
+      if (['done', 'progress', 'delayed', 'notstarted'].includes(f.status) && this.statusKey(a) !== f.status) return false;
+      if (f.sel) {
+        if (f.sel.startsWith('z:') && !f.sel.includes('|s:')) { if (('z:' + (a.zone || '_')) !== f.sel) return false; }
+        else if (f.sel.includes('|s:')) { if (('z:' + (a.zone || '_') + '|s:' + (a.system || 'other')) !== f.sel) return false; }
+      }
+      if (f.q) {
+        const hay = `${a.activityId} ${a.name} ${a.wbs} ${this.zoneName(a.zone)} ${this.streetName(a.street)}`.toLowerCase();
+        if (!hay.includes(f.q.toLowerCase())) return false;
+      }
+      return true;
+    });
+  },
+
+  p6View(b, rr) {
+    const ctx = this.guard(b, rr); if (!ctx) return;
+    const { acts } = ctx;
+    const f = this.p6State();
+    const filtered = this.p6Filtered(acts);
+    const ppdMap = { day: 26, week: 9, month: 3, quarter: 1.1, year: .45 };
+    const ppd = ppdMap[this.ganttZoom] || 3;
+
+    let min = '', max = '';
+    filtered.forEach(a => {
+      [a.baselineStart, a.start, a.actualStart].forEach(d => { if (d && (!min || d < min)) min = d; });
+      [a.baselineFinish, a.finish, a.forecastFinish].forEach(d => { if (d && (!max || d > max)) max = d; });
+    });
+    if (!min) min = todayISO(); if (!max || max <= min) max = dOff(120);
+    const totalDays = schDaysBetween(min, max) + 10;
+    const totalW = Math.max(300, Math.round(totalDays * ppd));
+    const X = d => d ? Math.round(schDaysBetween(min, d) * ppd) : 0;
+
+    const head = [];
+    let d = new Date(min); d.setDate(1);
+    const step = this.ganttZoom === 'year' ? 'y' : this.ganttZoom === 'quarter' ? 'q' : 'm';
+    while (d.toISOString().slice(0, 10) <= max) {
+      const s = new Date(d), n = new Date(d);
+      let label;
+      if (step === 'y') { n.setFullYear(n.getFullYear() + 1); label = s.getFullYear(); }
+      else if (step === 'q') { n.setMonth(n.getMonth() + 3); label = `Q${Math.floor(s.getMonth() / 3) + 1} ${String(s.getFullYear()).slice(2)}`; }
+      else { n.setMonth(n.getMonth() + 1); label = `${t('months')[s.getMonth()].slice(0, 3)} ${String(s.getFullYear()).slice(2)}`; }
+      head.push({ label, w: Math.round(((n - s) / 86400000) * ppd) });
+      d = n;
+    }
+
+    const rows = [];
+    const byZone = new Map();
+    filtered.forEach(a => { const k = a.zone || '_'; if (!byZone.has(k)) byZone.set(k, []); byZone.get(k).push(a); });
+    const span = arr => ({ s: arr.reduce((m, a) => (a.start && (!m || a.start < m)) ? a.start : m, ''), fEnd: arr.reduce((m, a) => (a.finish || '') > m ? a.finish : m, '') });
+    [...byZone.entries()].forEach(([zid, zacts]) => {
+      const zId = 'z:' + zid, zOpen = !f.collapsed.has(zId), zSpan = span(zacts);
+      rows.push({ kind: 'sum', level: 0, id: zId, label: this.zoneName(zid) || TX('بدون منطقة', 'Unassigned'), count: zacts.length, delayed: zacts.filter(a => this.isDelayed(a)).length, open: zOpen, s: zSpan.s, fEnd: zSpan.fEnd });
+      if (!zOpen) return;
+      const bySys = new Map();
+      zacts.forEach(a => { const k = a.system || 'other'; if (!bySys.has(k)) bySys.set(k, []); bySys.get(k).push(a); });
+      [...bySys.entries()].forEach(([sys, sacts]) => {
+        const S = this.SYSTEMS.find(x => x.key === sys) || this.SYSTEMS[this.SYSTEMS.length - 1];
+        const sId = zId + '|s:' + sys, sOpen = !f.collapsed.has(sId), sSpan = span(sacts);
+        rows.push({ kind: 'sum', level: 1, id: sId, label: S.icon + ' ' + S.label(), count: sacts.length, delayed: sacts.filter(a => this.isDelayed(a)).length, open: sOpen, s: sSpan.s, fEnd: sSpan.fEnd });
+        if (!sOpen) return;
+        sacts.slice().sort((x, y) => (x.start || '').localeCompare(y.start || '')).forEach(a => rows.push({ kind: 'act', level: 2, act: a }));
+      });
+    });
+    const capped = rows.length > 800 ? rows.slice(0, 800) : rows;
+    const rowH = 26, bodyH = Math.max(rowH, capped.length * rowH);
+
+    const idxOf = {}; capped.forEach((r, i) => { if (r.kind === 'act') idxOf[r.act.activityId] = i; });
+
+    const fmtD = iso => iso ? `${String(new Date(iso).getDate()).padStart(2, '0')}-${t('months')[new Date(iso).getMonth()].slice(0, 3)}-${String(new Date(iso).getFullYear()).slice(2)}` : '';
+    const tcols = `<div style="width:248px">${TX('اسم النشاط', 'Activity Name')}</div><div style="width:84px">ID</div>
+      <div style="width:74px">Start</div><div style="width:74px">Finish</div><div style="width:42px">Dur</div>
+      <div style="width:42px">Rem</div><div style="width:42px">%</div><div style="width:46px">Float</div><div style="width:66px">${TX('الحالة', 'Status')}</div>`;
+    const tableRows = capped.map(r => {
+      if (r.kind === 'sum') {
+        return `<div class="p6-trow sum" data-twist="${esc(r.id)}">
+          <div style="width:248px"><span class="p6-twist ${r.open ? 'open' : ''}">▸</span><span style="display:inline-block;width:${r.level * 12}px"></span><b>${esc(r.label)}</b></div>
+          <div style="width:84px" class="mut">${r.count}</div>
+          <div style="width:74px">${fmtD(r.s)}</div><div style="width:74px">${fmtD(r.fEnd)}</div>
+          <div style="width:42px"></div><div style="width:42px"></div><div style="width:42px"></div><div style="width:46px"></div>
+          <div style="width:66px">${r.delayed ? `<span style="color:#f59e0b">⏰${r.delayed}</span>` : ''}</div></div>`;
+      }
+      const a = r.act, col = this.p6Color(a), sk = this.statusKey(a);
+      return `<div class="p6-trow" data-id="${a.id}">
+        <div style="width:248px" title="${esc(a.name)}"><span style="display:inline-block;width:${12 + r.level * 10}px"></span>${a.milestone ? '◆ ' : ''}${a.critical ? '🔴 ' : ''}${esc(a.name)}</div>
+        <div style="width:84px" class="mut">${esc(a.activityId)}</div>
+        <div style="width:74px">${fmtD(a.start)}</div><div style="width:74px">${fmtD(a.finish)}</div>
+        <div style="width:42px">${a.duration || 0}</div><div style="width:42px">${a.remainingDuration != null ? a.remainingDuration : (a.duration || 0)}</div>
+        <div style="width:42px">${Math.round(a.pctComplete || 0)}</div>
+        <div style="width:46px;${a.critical ? 'color:#ef4444' : ''}">${a.float != null ? a.float : '—'}</div>
+        <div style="width:66px"><span style="color:${col}">●</span> ${this.statusLabel(sk).slice(0, 8)}</div></div>`;
+    }).join('');
+
+    const bars = capped.map((r, i) => {
+      const y = i * rowH;
+      if (r.kind === 'sum') {
+        if (!r.s || !r.fEnd) return '';
+        const x = X(r.s), w = Math.max(4, X(r.fEnd) - x);
+        return `<div class="p6-sum" style="inset-inline-start:${x}px;width:${w}px;top:${y + 9}px"></div>`;
+      }
+      const a = r.act, col = this.p6Color(a);
+      if (a.milestone) {
+        const x = X(a.start || a.finish);
+        return `<div class="p6-ms ${a.critical ? 'p6-mscrit' : ''}" data-id="${a.id}" style="inset-inline-start:${x - 6}px;top:${y + 7}px;background:${a.critical ? '#ef4444' : col}"></div>`;
+      }
+      const x = X(a.start), w = Math.max(3, X(a.finish) - x);
+      const bl = (a.baselineStart && a.baselineFinish)
+        ? `<div class="p6-bl" style="inset-inline-start:${X(a.baselineStart)}px;width:${Math.max(3, X(a.baselineFinish) - X(a.baselineStart))}px;top:${y + 19}px"></div>` : '';
+      return `${bl}<div class="p6-bar" data-id="${a.id}" title="${esc(a.name)} — ${Math.round(a.pctComplete || 0)}%" style="inset-inline-start:${x}px;width:${w}px;top:${y + 7}px;background:${col}"><span class="pf" style="width:${Math.min(100, a.pctComplete || 0)}%"></span></div>`;
+    }).join('');
+
+    let lines = '';
+    if (f.showRel && Object.keys(idxOf).length <= 350) {
+      const segs = [];
+      capped.forEach((r, si) => {
+        if (r.kind !== 'act') return;
+        const succ = r.act;
+        (succ.predecessors || []).forEach(p => {
+          const pi = idxOf[p.code]; if (pi === undefined) return;
+          const pred = capped[pi].act;
+          const xPs = X(pred.start), xPf = Math.max(X(pred.start) + 3, X(pred.finish));
+          const xTs = X(succ.start), xTf = Math.max(X(succ.start) + 3, X(succ.finish));
+          let sx, tx;
+          if (p.type === 'SS') { sx = xPs; tx = xTs; }
+          else if (p.type === 'FF') { sx = xPf; tx = xTf; }
+          else if (p.type === 'SF') { sx = xPs; tx = xTf; }
+          else { sx = xPf; tx = xTs; }
+          const sy = pi * rowH + 13, ty = si * rowH + 13;
+          const out = tx >= sx ? 6 : -6;
+          const arr = tx >= sx ? `M${tx - 5},${ty - 3} L${tx},${ty} L${tx - 5},${ty + 3}` : `M${tx + 5},${ty - 3} L${tx},${ty} L${tx + 5},${ty + 3}`;
+          segs.push(`<path d="M${sx},${sy} L${sx + out},${sy} L${sx + out},${ty} L${tx},${ty}" fill="none" stroke="var(--txt-3)" stroke-width="1" opacity=".5"/><path d="${arr}" fill="none" stroke="var(--txt-3)" stroke-width="1" opacity=".7"/>`);
+        });
+      });
+      lines = `<svg class="p6-rel" width="${totalW}" height="${bodyH}">${segs.join('')}</svg>`;
+    }
+
+    const tree = this.p6TreeHtml(acts);
+    const zones = Store.getMasterList('zones', { includeArchived: true });
+    const contractors = Store.getProjectOrgs('contractor');
+
+    b.innerHTML = `
+      <div class="flex" style="gap:6px;margin-bottom:8px;flex-wrap:wrap;align-items:center">
+        <input class="input" id="p6-q" placeholder="${TX('بحث: ID / اسم / WBS / منطقة', 'Search: ID / name / WBS / zone')}" value="${esc(f.q)}" style="max-width:240px">
+        <select class="input" id="p6-zone" style="max-width:130px"><option value="">${TX('منطقة', 'Zone')}</option>${zones.map(z => `<option value="${z.id}" ${f.zone === z.id ? 'selected' : ''}>${esc(z.name)}</option>`).join('')}</select>
+        <select class="input" id="p6-sys" style="max-width:130px"><option value="">${TX('نظام', 'System')}</option>${this.SYSTEMS.map(s => `<option value="${s.key}" ${f.system === s.key ? 'selected' : ''}>${s.icon} ${s.label()}</option>`).join('')}</select>
+        <select class="input" id="p6-co" style="max-width:130px"><option value="">${TX('مقاول', 'Contractor')}</option>${contractors.map(c => `<option value="${c.id}" ${f.contractor === c.id ? 'selected' : ''}>${esc(LANG === 'ar' ? c.name : (c.nameEn || c.name))}</option>`).join('')}</select>
+        <select class="input" id="p6-st" style="max-width:120px"><option value="">${TX('الحالة', 'Status')}</option>
+          ${[['critical', '🔴 Critical'], ['delayed', '⏰ ' + TX('متأخر', 'Delayed')], ['done', '✅ ' + TX('مكتمل', 'Done')], ['progress', '🔵 ' + TX('جاري', 'In Progress')], ['notstarted', '⚪ ' + TX('لم يبدأ', 'Not Started')]].map(([k, l]) => `<option value="${k}" ${f.status === k ? 'selected' : ''}>${l}</option>`).join('')}</select>
+        <div class="tb-spacer"></div>
+        <label class="fs11 flex" style="gap:4px"><input type="checkbox" id="p6-rel" ${f.showRel ? 'checked' : ''}>${TX('العلاقات', 'Logic')}</label>
+        <button class="btn sm" id="p6-zo">➖</button>
+        ${[['day', 'D'], ['week', 'W'], ['month', 'M'], ['quarter', 'Q'], ['year', 'Y']].map(([k, l]) => `<button class="btn sm ${this.ganttZoom === k ? 'primary' : ''}" data-z="${k}" title="${k}">${l}</button>`).join('')}
+        <button class="btn sm" id="p6-zi">➕</button>
+        <button class="btn sm" id="p6-exp" title="${TX('فتح الكل', 'Expand all')}">⊞</button><button class="btn sm" id="p6-col" title="${TX('طي الكل', 'Collapse all')}">⊟</button>
+        <button class="btn sm" id="p6-full" title="${TX('ملء الشاشة', 'Full screen')}">⛶</button>
+      </div>
+      <div class="p6-legend">
+        <span><i style="background:#22c55e"></i>${TX('مكتمل', 'Completed')}</span>
+        <span><i style="background:#3b82f6"></i>${TX('جاري', 'In Progress')}</span>
+        <span><i style="background:#94a3b8"></i>${TX('لم يبدأ', 'Not Started')}</span>
+        <span><i style="background:#ef4444"></i>Critical</span>
+        <span><i style="background:#f59e0b"></i>${TX('متأخر', 'Delayed')}</span>
+        <span><i style="background:#64748b;height:4px"></i>Baseline</span>
+        <span>◆ Milestone</span>
+      </div>
+      <div class="p6-wrap">
+        <div class="p6-tree" id="p6-tree">
+          <input class="input" id="p6-treeq" placeholder="${t('search')}" value="${esc(f.treeQ)}" style="width:100%;margin-bottom:6px;font-size:11px">
+          <div class="p6-tnode ${!f.sel ? 'sel' : ''}"><div class="p6-tlabel" data-sel=""><b>📁 ${esc(LANG === 'ar' ? Store.cur().name : Store.cur().nameEn)}</b><span class="p6-tcount">${acts.length}</span></div></div>
+          ${tree}
+        </div>
+        <div class="p6-grid" id="p6-grid" style="direction:ltr">
+          <div class="p6-inner">
+            <div class="p6-tbl">
+              <div class="p6-thead p6-th">${tcols}</div>
+              ${tableRows}
+            </div>
+            <div class="p6-gantt">
+              <div class="p6-ghead" style="width:${totalW}px">${head.map(h => `<div class="p6-gm" style="width:${h.w}px;line-height:44px">${h.label}</div>`).join('')}</div>
+              <div class="p6-gbody" style="width:${totalW}px;height:${bodyH}px">
+                <div class="p6-today" style="inset-inline-start:${X(todayISO())}px"></div>
+                ${lines}${bars}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="fs11 mut mt8">${filtered.length} ${TX('نشاط', 'activities')}${rows.length > 800 ? ` · ${TX('يُعرض 800 صف — استخدم الفلاتر', 'showing 800 rows — use filters')}` : ''}</div>`;
+
+    const re = () => this.p6View(b, rr);
+    const qel = b.querySelector('#p6-q');
+    qel.oninput = e => { f.q = e.target.value; re(); const i = b.querySelector('#p6-q'); i.focus(); i.setSelectionRange(i.value.length, i.value.length); };
+    b.querySelector('#p6-zone').onchange = e => { f.zone = e.target.value; re(); };
+    b.querySelector('#p6-sys').onchange = e => { f.system = e.target.value; re(); };
+    b.querySelector('#p6-co').onchange = e => { f.contractor = e.target.value; re(); };
+    b.querySelector('#p6-st').onchange = e => { f.status = e.target.value; re(); };
+    b.querySelector('#p6-rel').onchange = e => { f.showRel = e.target.checked; re(); };
+    b.querySelector('#p6-treeq').oninput = e => { f.treeQ = e.target.value; re(); const i = b.querySelector('#p6-treeq'); i.focus(); i.setSelectionRange(i.value.length, i.value.length); };
+    const zOrder = ['year', 'quarter', 'month', 'week', 'day'];
+    b.querySelector('#p6-zi').onclick = () => { const i = zOrder.indexOf(this.ganttZoom); this.ganttZoom = zOrder[Math.min(4, i + 1)]; re(); };
+    b.querySelector('#p6-zo').onclick = () => { const i = zOrder.indexOf(this.ganttZoom); this.ganttZoom = zOrder[Math.max(0, i - 1)]; re(); };
+    b.querySelectorAll('[data-z]').forEach(btn => btn.onclick = () => { this.ganttZoom = btn.dataset.z; re(); });
+    b.querySelector('#p6-exp').onclick = () => { f.collapsed.clear(); re(); };
+    b.querySelector('#p6-col').onclick = () => { rows.forEach(r => { if (r.kind === 'sum') f.collapsed.add(r.id); }); re(); };
+    b.querySelector('#p6-full').onclick = () => { const g = b.querySelector('#p6-grid'); if (!document.fullscreenElement && g.requestFullscreen) g.requestFullscreen(); else if (document.exitFullscreen) document.exitFullscreen(); };
+    b.querySelectorAll('[data-twist]').forEach(el => el.onclick = () => { const id = el.dataset.twist; if (f.collapsed.has(id)) f.collapsed.delete(id); else f.collapsed.add(id); re(); });
+    b.querySelectorAll('[data-sel]').forEach(el => el.onclick = (e) => { e.stopPropagation(); f.sel = el.dataset.sel; re(); });
+    b.querySelectorAll('.p6-tbl [data-id]').forEach(el => el.onclick = () => this.activityDetail(el.dataset.id, rr));
+    b.querySelectorAll('.p6-gbody [data-id]').forEach(el => el.onclick = () => this.activityDetail(el.dataset.id, rr));
+  },
+
+  p6TreeHtml(acts) {
+    const f = this.p6State();
+    const q = (f.treeQ || '').toLowerCase();
+    const byZone = new Map();
+    acts.forEach(a => { const k = a.zone || '_'; if (!byZone.has(k)) byZone.set(k, []); byZone.get(k).push(a); });
+    return [...byZone.entries()].map(([zid, zacts]) => {
+      const zName = this.zoneName(zid) || TX('بدون منطقة', 'Unassigned');
+      const zId = 'z:' + zid;
+      const bySys = new Map();
+      zacts.forEach(a => { const k = a.system || 'other'; if (!bySys.has(k)) bySys.set(k, []); bySys.get(k).push(a); });
+      const sysHtml = [...bySys.entries()].map(([sys, sacts]) => {
+        const S = this.SYSTEMS.find(x => x.key === sys) || this.SYSTEMS[this.SYSTEMS.length - 1];
+        const sId = zId + '|s:' + sys;
+        if (q && !(`${zName} ${S.label()}`.toLowerCase().includes(q))) return '';
+        const del = sacts.filter(a => this.isDelayed(a)).length;
+        return `<div class="p6-tnode ${f.sel === sId ? 'sel' : ''}"><div class="p6-tlabel" data-sel="${esc(sId)}">${S.icon} ${S.label()}<span class="p6-tcount">${sacts.length}${del ? ' ⏰' + del : ''}</span></div></div>`;
+      }).join('');
+      if (q && !sysHtml && !zName.toLowerCase().includes(q)) return '';
+      return `<div class="p6-tnode ${f.sel === zId ? 'sel' : ''}"><div class="p6-tlabel" data-sel="${esc(zId)}">📍 <b>${esc(zName)}</b><span class="p6-tcount">${zacts.length}</span></div><div class="p6-tkids">${sysHtml}</div></div>`;
+    }).join('');
   },
 
   noFileState() {

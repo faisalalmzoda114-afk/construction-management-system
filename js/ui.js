@@ -217,7 +217,14 @@ const UI = {
       case 'attachments': return v.map(a => `<span class="tag">📎 ${esc(a.name)}</span>`).join(' ');
       case 'priority': return UI.prioChip(v);
       case 'select': return esc(UI.optLabel(v));
-      default: return esc(String(v)).replace(/\n/g, '<br>');
+      default: {
+        // resolve master-data ids (organizations / people) to display names
+        const o = Store.getOrganization && Store.getOrganization(v);
+        if (o) return esc(LANG === 'ar' ? o.name : (o.nameEn || o.name));
+        const p = Store.getPerson && Store.getPerson(v);
+        if (p) return esc(LANG === 'ar' ? p.name : (p.nameEn || p.name));
+        return esc(String(v)).replace(/\n/g, '<br>');
+      }
     }
   },
 

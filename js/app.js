@@ -180,11 +180,81 @@ const App = {
             </div>`).join('')}
         </div>
         <button class="btn ghost sm" id="pf-add-ms">${t('addMilestone')}</button>
+
+        <div class="section-t">${LANG === 'ar' ? 'أطراف المشروع' : 'Project Parties'}</div>
+        <div class="fs11 mut" style="margin-bottom:10px">${LANG === 'ar' ? 'عرّف مقاولي واستشاريي وأشخاص هذا المشروع — تظهر في قوائم المعوقات الخاصة بالمشروع فقط.' : "Define this project's contractors, consultants and people — they appear only in this project's issue lists."}</div>
+        <div id="pf-parties"></div>
+
         <div class="flex mt14" style="justify-content:flex-end">
           <button class="btn" data-close>${t('cancel')}</button>
           <button class="btn primary" id="pf-save">${t('save')}</button>
         </div>
       </div>`, { wide: true });
+
+    /* ---- project parties editor ---- */
+    const partyGroups = [
+      { key: 'contractor', kind: 'org', label: LANG === 'ar' ? 'المقاولون' : 'Contractors' },
+      { key: 'consultant', kind: 'org', label: LANG === 'ar' ? 'الاستشاريون' : 'Consultants' },
+      { key: 'developer', kind: 'org', label: LANG === 'ar' ? 'المطورون' : 'Developers' },
+      { key: 'client', kind: 'org', label: LANG === 'ar' ? 'العميل / المالك' : 'Client / Owner' },
+      { key: 'people', kind: 'people', label: LANG === 'ar' ? 'أشخاص المشروع' : 'Project People' },
+    ];
+    const partiesWrap = m.el.querySelector('#pf-parties');
+    const existing = {};
+    if (rec) {
+      partyGroups.forEach(g => {
+        existing[g.key] = g.kind === 'org'
+          ? Store.getMasterList('organizations', { projectId: rec.id, shared: false, includeArchived: true }).filter(o => o.type === g.key)
+          : Store.getMasterList('people', { projectId: rec.id, shared: false, includeArchived: true });
+      });
+    }
+    partyGroups.forEach(g => {
+      const box = document.createElement('div');
+      box.style.marginBottom = '12px';
+      box.innerHTML = `<div class="fl" style="margin-bottom:6px">${g.label}</div><div data-pg="${g.key}"></div>
+        <button type="button" class="btn ghost sm" data-pg-add="${g.key}">＋ ${t('add')}</button>`;
+      partiesWrap.appendChild(box);
+      const rows = box.querySelector(`[data-pg="${g.key}"]`);
+      const addRow = (item) => {
+        const row = document.createElement('div');
+        row.className = 'flex'; row.style.cssText = 'gap:8px;margin-bottom:6px'; row.setAttribute('data-pg-row', g.key);
+        if (item && item.id) row.setAttribute('data-id', item.id);
+        row.innerHTML = g.kind === 'people'
+          ? `<input class="input" data-pg-name placeholder="${LANG === 'ar' ? 'الاسم' : 'Name'}" value="${esc(item ? (item.name || '') : '')}" style="flex:1">
+             <input class="input" data-pg-pos placeholder="${LANG === 'ar' ? 'المسمى' : 'Position'}" value="${esc(item ? (item.position || '') : '')}" style="flex:1">
+             <button class="x-btn sm" data-pg-del>✕</button>`
+          : `<input class="input" data-pg-name placeholder="${LANG === 'ar' ? 'الاسم' : 'Name'}" value="${esc(item ? (item.name || '') : '')}" style="flex:1">
+             <button class="x-btn sm" data-pg-del>✕</button>`;
+        row.querySelector('[data-pg-del]').onclick = () => row.remove();
+        rows.appendChild(row);
+      };
+      (existing[g.key] || []).forEach(addRow);
+      box.querySelector(`[data-pg-add="${g.key}"]`).onclick = () => addRow();
+    });
+    const saveParties = (projectId) => {
+      partyGroups.forEach(g => {
+        const seen = [];
+        partiesWrap.querySelectorAll(`[data-pg-row="${g.key}"]`).forEach(row => {
+          const name = row.querySelector('[data-pg-name]').value.trim();
+          if (!name) return;
+          const id = row.getAttribute('data-id');
+          const pos = g.kind === 'people' ? row.querySelector('[data-pg-pos]').value.trim() : '';
+          if (id) {
+            seen.push(id);
+            const arr = g.kind === 'org' ? Store.db.masterData.organizations : Store.db.masterData.people;
+            const it = arr.find(x => x.id === id);
+            if (it) { it.name = name; it.nameEn = it.nameEn || name; if (g.kind === 'people') it.position = pos; it.archived = false; }
+          } else if (g.kind === 'org') {
+            seen.push(Store.addToMasterList('organizations', { type: g.key, name, nameEn: name, projectId }).id);
+          } else {
+            seen.push(Store.addToMasterList('people', { name, nameEn: name, position: pos, projectId }).id);
+          }
+        });
+        // archive removed existing items (kept for old records)
+        (existing[g.key] || []).forEach(it => { if (!seen.includes(it.id)) it.archived = true; });
+      });
+      Store.save();
+    };
 
     const msWrap = m.el.querySelector('#pf-milestones');
     const addMsRow = (title = '', date = '') => {
@@ -224,8 +294,8 @@ const App = {
         plannedProgress: Number(m.el.querySelector('#pf-planned').value) || 0,
         milestones,
       };
-      if (isEdit) Store.updateProject(rec.id, data);
-      else Store.createProject(data);
+      const saved = isEdit ? Store.updateProject(rec.id, data) : Store.createProject(data);
+      saveParties(saved.id);
       UI.toast(t('saved'));
       m.close();
       this.projectCenter();

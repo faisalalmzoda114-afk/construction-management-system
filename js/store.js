@@ -152,8 +152,6 @@ function defaultSchemas() {
         { key: 'approver',  type: 'text', label: L('Approver', 'المعتمد') },
         { key: 'watchers',  type: 'tags', label: L('Watchers', 'المتابعون') },
         { key: 'supportingParties', type: 'tags', label: L('Supporting Parties', 'جهات مساندة') },
-        { key: 'affectedZone',   type: 'text', label: L('Affected Zone', 'المنطقة المتأثرة') },
-        { key: 'affectedStreet', type: 'text', label: L('Affected Street', 'الشارع المتأثر') },
       ],
       statuses: [
         ST('draft', 'Draft', 'مسودة', '#94a3b8'),
@@ -763,8 +761,27 @@ function seedDB() {
       ],
     },
   };
+  seedProjectParties(db);
   seedConstraintsFor(db);
   return db;
+}
+
+/* ---------- seed: assign per-project parties (orgs + people) ---------- */
+function seedProjectParties(db) {
+  const md = db.masterData;
+  const projs = db.projects;
+  // tie each seeded organization + its contact person to a specific project
+  const orgProj = { org_c1: 'p1', org_c2: 'p2', org_c3: 'p3', org_c4: 'p4', org_c5: 'p1', org_c6: 'p5' };
+  md.organizations.forEach(o => { if (orgProj[o.id]) o.projectId = orgProj[o.id]; });
+  md.people.forEach(p => { const o = md.organizations.find(x => x.id === p.company); if (o && o.projectId) p.projectId = o.projectId; });
+  // give each project its own consultant + developer + client so lists differ per project
+  const consultants = ['دار الرياض للاستشارات', 'مكتب الخبراء الهندسي', 'الاستشارات المتقدمة', 'بيت الخبرة الوطني', 'الهندسة الشاملة', 'استشارات المستقبل', 'الرواد للاستشارات', 'المعايير الهندسية'];
+  const developers = ['شركة التطوير العمراني', 'مدن العقارية', 'الإعمار القابضة', 'تطوير الوجهات', 'البنية للتطوير', 'رؤية العقارية', 'المستقبل للتطوير', 'الديار للتطوير'];
+  projs.forEach((p, i) => {
+    md.organizations.push({ id: uid('org'), type: 'consultant', name: consultants[i % consultants.length], nameEn: '', contactPerson: '', email: '', mobile: '', notes: '', projectId: p.id, active: true, archived: false });
+    md.organizations.push({ id: uid('org'), type: 'developer', name: developers[i % developers.length], nameEn: '', contactPerson: '', email: '', mobile: '', notes: '', projectId: p.id, active: true, archived: false });
+    if (p.client) md.organizations.push({ id: uid('org'), type: 'client', name: p.client, nameEn: '', contactPerson: '', email: '', mobile: '', notes: '', projectId: p.id, active: true, archived: false });
+  });
 }
 
 /* ---------- seed: issue & constraint tracking (case files) ---------- */
@@ -926,6 +943,24 @@ const Store = {
         r.modules.push('tracker'); changed = true;
       }
     });
+    // ensure master data structure exists (older saved databases)
+    if (!this.db.masterData) { this.db.masterData = seedDB().masterData; changed = true; }
+    else {
+      const fresh = seedDB().masterData;
+      Object.keys(fresh).forEach(k => { if (!this.db.masterData[k]) { this.db.masterData[k] = fresh[k]; changed = true; } });
+    }
+    // sync constraint schema fields (reviewer/approver/watchers/supportingParties added; affected* removed)
+    const csch = this.db.schemas.constraint;
+    if (csch && Array.isArray(csch.fields)) {
+      const want = ['reviewer', 'approver', 'watchers', 'supportingParties'];
+      const def = defaultSchemas().constraint.fields;
+      want.forEach(k => {
+        if (!csch.fields.some(f => f.key === k)) { csch.fields.push(def.find(f => f.key === k)); changed = true; }
+      });
+      const before = csch.fields.length;
+      csch.fields = csch.fields.filter(f => !['affectedZone', 'affectedStreet'].includes(f.key));
+      if (csch.fields.length !== before) changed = true;
+    }
     if (changed) this.save();
   },
   save() { localStorage.setItem(DB_KEY, JSON.stringify(this.db)); },
@@ -1098,9 +1133,17 @@ const Store = {
     return this.db.masterData[category] || [];
   },
 
-  // Master Data - Enhanced Queries
-  getMasterList(category, { onlyActive = true, includeArchived = false } = {}) {
-    const items = this.db.masterData[category] || [];
+  // categories whose items belong to a specific project (vs. shared across all)
+  PROJECT_SCOPED: ['people', 'organizations', 'zones', 'streets', 'subcategories'],
+
+  // Master Data - Enhanced Queries (project-aware)
+  getMasterList(category, opts = {}) {
+    const { onlyActive = true, includeArchived = false, projectId, shared = true } = opts;
+    let items = this.db.masterData[category] || [];
+    if (this.PROJECT_SCOPED.includes(category) && projectId !== '*') {
+      const pid = projectId === undefined ? this.db.currentProjectId : projectId;
+      items = items.filter(it => it.projectId ? it.projectId === pid : shared);
+    }
     return items.filter(item => {
       if (includeArchived) return true;
       if (onlyActive) return item.active && !item.archived;
@@ -1120,13 +1163,25 @@ const Store = {
   },
 
   addToMasterList(category, item) {
-    if (!this.db.masterData[category]) return false;
+    if (!this.db.masterData[category]) this.db.masterData[category] = [];
     item.id = item.id || uid(category.slice(0, 3));
     item.active = item.active !== false;
     item.archived = item.archived || false;
+    // auto-tag new project-scoped items to the current project unless explicitly shared/assigned
+    if (this.PROJECT_SCOPED.includes(category) && item.projectId === undefined && !item.shared) {
+      item.projectId = this.db.currentProjectId;
+    }
     this.db.masterData[category].push(item);
     this.save();
     return item;
+  },
+
+  // convenience: project-scoped organizations of a given type (+ shared)
+  getProjectOrgs(type, projectId) {
+    return this.getMasterList('organizations', { projectId }).filter(o => !type || o.type === type);
+  },
+  getProjectPeople(projectId) {
+    return this.getMasterList('people', { projectId });
   },
 
   // People & Organization Directory

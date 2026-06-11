@@ -303,10 +303,16 @@ const ModAdmin = {
     }
     return `<input class="input" id="mdf-${f.key}" value="${esc(val || '')}">`;
   },
+  mdProject: '*',
   masterData(body, rr) {
     this.mdCat = this.mdCat || 'people';
     const catCfg = this.mdCategories.find(c => c.key === this.mdCat);
-    const items = Store.getMasterList(this.mdCat, { includeArchived: true });
+    const scoped = Store.PROJECT_SCOPED.includes(this.mdCat);
+    const projOf = it => { const p = Store.db.projects.find(x => x.id === it.projectId); return p ? (p.code || p.name) : (it.projectId ? it.projectId : (LANG === 'ar' ? 'مشترك' : 'Shared')); };
+    let items = Store.getMasterList(this.mdCat, { includeArchived: true, projectId: '*' });
+    if (scoped && this.mdProject !== '*') {
+      items = this.mdProject === '_shared' ? items.filter(i => !i.projectId) : items.filter(i => i.projectId === this.mdProject);
+    }
     body.innerHTML = `
       <div style="display:grid;grid-template-columns:220px 1fr;gap:16px;align-items:start">
         <div class="panel">
@@ -316,27 +322,38 @@ const ModAdmin = {
           </div>
         </div>
         <div class="panel" style="overflow-x:auto">
-          <div class="panel-h"><h3>${catCfg.icon} ${catCfg.label()}</h3><div class="spacer"></div><button class="btn primary sm" id="md-add">＋ ${t('add')}</button></div>
-          <table class="tbl"><thead><tr>${catCfg.fields.map(f => `<th>${f.label()}</th>`).join('')}<th>${LANG === 'ar' ? 'الحالة' : 'Status'}</th><th></th></tr></thead><tbody>
+          <div class="panel-h"><h3>${catCfg.icon} ${catCfg.label()}</h3><div class="spacer"></div>
+            ${scoped ? `<select class="input sm" id="md-proj" style="width:auto;margin-inline-end:8px">
+              <option value="*" ${this.mdProject === '*' ? 'selected' : ''}>${LANG === 'ar' ? 'كل المشاريع' : 'All projects'}</option>
+              <option value="_shared" ${this.mdProject === '_shared' ? 'selected' : ''}>${LANG === 'ar' ? 'مشترك (كل المشاريع)' : 'Shared'}</option>
+              ${Store.db.projects.map(p => `<option value="${p.id}" ${this.mdProject === p.id ? 'selected' : ''}>${esc(p.code || p.name)}</option>`).join('')}
+            </select>` : ''}
+            <button class="btn primary sm" id="md-add">＋ ${t('add')}</button></div>
+          <table class="tbl"><thead><tr>${catCfg.fields.map(f => `<th>${f.label()}</th>`).join('')}${scoped ? `<th>${LANG === 'ar' ? 'المشروع' : 'Project'}</th>` : ''}<th>${LANG === 'ar' ? 'الحالة' : 'Status'}</th><th></th></tr></thead><tbody>
           ${items.map(it => `<tr style="${it.archived ? 'opacity:.5' : ''}">
             ${catCfg.fields.map(f => `<td class="fs12">${esc(this.mdFieldDisplay(f, it))}</td>`).join('')}
+            ${scoped ? `<td class="fs12">${esc(projOf(it))}</td>` : ''}
             <td>${it.archived ? `<span class="tag">${LANG === 'ar' ? 'مؤرشف' : 'archived'}</span>` : (it.active === false ? `<span class="tag">${LANG === 'ar' ? 'غير نشط' : 'inactive'}</span>` : `<span class="tag" style="background:rgba(52,211,153,.15);color:#34d399">${LANG === 'ar' ? 'نشط' : 'active'}</span>`)}</td>
             <td style="white-space:nowrap">
               <button class="btn sm" data-mded="${it.id}">✏️</button>
               <button class="btn sm" data-mdarc="${it.id}">${it.archived ? '♻️' : '🗄'}</button>
               <button class="btn sm danger" data-mdrm="${it.id}">🗑</button>
-            </td></tr>`).join('') || `<tr><td colspan="${catCfg.fields.length + 2}">${UI.empty('🗄')}</td></tr>`}
+            </td></tr>`).join('') || `<tr><td colspan="${catCfg.fields.length + (scoped ? 3 : 2)}">${UI.empty('🗄')}</td></tr>`}
           </tbody></table>
-          <div class="fs11 mut mt8">${LANG === 'ar' ? 'العناصر المؤرشفة تبقى مرتبطة بالسجلات القديمة لكنها تختفي من القوائم الجديدة.' : 'Archived items stay linked to old records but are hidden from new dropdowns.'}</div>
+          <div class="fs11 mut mt8">${LANG === 'ar' ? 'العناصر المؤرشفة تبقى مرتبطة بالسجلات القديمة لكنها تختفي من القوائم الجديدة. «مشترك» يظهر في كل المشاريع.' : 'Archived items stay linked to old records but are hidden from new dropdowns. “Shared” items appear in every project.'}</div>
         </div>
       </div>`;
     body.querySelectorAll('[data-mdc]').forEach(b => b.onclick = () => { this.mdCat = b.dataset.mdc; rr(); });
+    const projSel = body.querySelector('#md-proj');
+    if (projSel) projSel.onchange = () => { this.mdProject = projSel.value; rr(); };
 
     const itemForm = (it) => {
+      const projOpts = `<option value="">${LANG === 'ar' ? 'مشترك (كل المشاريع)' : 'Shared (all projects)'}</option>${Store.db.projects.map(p => `<option value="${p.id}" ${(it ? it.projectId : (this.mdProject !== '*' && this.mdProject !== '_shared' ? this.mdProject : Store.db.currentProjectId)) === p.id ? 'selected' : ''}>${esc(p.code || p.name)}</option>`).join('')}`;
       const m = UI.modal(`
         <div class="drawer-h"><h2>${it ? '✏️' : '＋'} ${catCfg.label()}</h2><button class="x-btn" data-close>✕</button></div>
         <div class="drawer-b"><div class="form-grid">
           ${catCfg.fields.map(f => `<div><label class="fl">${f.label()}</label>${this.mdFieldInput(f, it ? it[f.key] : '')}</div>`).join('')}
+          ${scoped ? `<div><label class="fl">${LANG === 'ar' ? 'المشروع' : 'Project'}</label><select class="input" id="mdf-projectId">${projOpts}</select></div>` : ''}
           <div><label class="fl">${LANG === 'ar' ? 'نشط' : 'Active'}</label><select class="input" id="mdf-active">
             <option value="1" ${!it || it.active !== false ? 'selected' : ''}>${t('yes')}</option>
             <option value="0" ${it && it.active === false ? 'selected' : ''}>${t('no')}</option></select></div>
@@ -347,7 +364,8 @@ const ModAdmin = {
         catCfg.fields.forEach(f => { data[f.key] = m.el.querySelector(`#mdf-${f.key}`).value.trim(); });
         if (!data.name && !data.nameEn) return UI.toast(t('required'), 'err');
         data.active = m.el.querySelector('#mdf-active').value === '1';
-        if (it) { Object.assign(it, data); }
+        if (scoped) data.projectId = m.el.querySelector('#mdf-projectId').value || undefined;
+        if (it) { Object.assign(it, data); if (scoped && !data.projectId) delete it.projectId; }
         else { data.id = uid(this.mdCat); data.archived = false; Store.db.masterData[this.mdCat].push(data); }
         Store.save(); m.close(); UI.toast(t('saved')); rr();
       };

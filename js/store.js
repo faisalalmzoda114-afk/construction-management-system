@@ -21,6 +21,7 @@ function defaultModules() {
     { key: 'risks',          icon: '🛡️', group: 'gExecution', labelKey: 'mRisks',          builtin: true, visible: true, entity: 'risk' },
     { key: 'issues',         icon: '🧩', group: 'gExecution', labelKey: 'mIssues',         builtin: true, visible: true, entity: 'issue' },
     { key: 'tracker',        icon: '🚩', group: 'gExecution', labelKey: 'mTracker',        builtin: true, visible: true, entity: 'constraint' },
+    { key: 'schedule',       icon: '🗓️', group: 'gExecution', labelKey: 'mSchedule',       builtin: true, visible: true },
     { key: 'observations',   icon: '📸', group: 'gExecution', labelKey: 'mObservations',   builtin: true, visible: true, entity: 'observation' },
     { key: 'contractors',    icon: '🏗️', group: 'gExecution', labelKey: 'mContractors',    builtin: true, visible: true },
     { key: 'correspondence', icon: '✉️', group: 'gKnowledge', labelKey: 'mCorrespondence', builtin: true, visible: true, entity: 'correspondence' },
@@ -670,6 +671,7 @@ function seedDB() {
     modules: defaultModules(), schemas: defaultSchemas(),
     workflows, dashboards, entities: E,
     counters,
+    schedule: { files: [], activities: [], audit: [], snapshots: [] },
     masterData: {
       // People Directory
       people: [
@@ -1008,6 +1010,20 @@ const Store = {
         }
       });
     });
+    // schedule & planning control center (new module)
+    if (!this.db.modules.some(m => m.key === 'schedule')) {
+      const mod = defaultModules().find(m => m.key === 'schedule');
+      const idx = this.db.modules.findIndex(m => m.key === 'tracker');
+      this.db.modules.splice(idx >= 0 ? idx + 1 : this.db.modules.length, 0, mod);
+      changed = true;
+    }
+    if (!this.db.schedule) { this.db.schedule = { files: [], activities: [], audit: [], snapshots: [] }; changed = true; }
+    else ['files', 'activities', 'audit', 'snapshots'].forEach(k => { if (!this.db.schedule[k]) { this.db.schedule[k] = []; changed = true; } });
+    this.db.roles.forEach(r => {
+      if (!r.modules.includes('*') && r.modules.includes('tracker') && !r.modules.includes('schedule')) {
+        r.modules.push('schedule'); changed = true;
+      }
+    });
     if (changed) this.save();
   },
   save() { localStorage.setItem(DB_KEY, JSON.stringify(this.db)); },
@@ -1238,6 +1254,90 @@ const Store = {
     const scoped = this.getMasterList('responsibleParties', { includeArchived: true }).find(x => x.key === key || x.id === key);
     const it = scoped || (this.db.masterData.responsibleParties || []).find(x => x.key === key || x.id === key);
     return it ? (LANG === 'ar' ? it.name : (it.nameEn || it.name)) : key;
+  },
+
+  /* ================= Schedule & Planning Control Center ================= */
+  scheduleFiles({ projectId } = {}) {
+    const pid = projectId || this.db.currentProjectId;
+    return this.db.schedule.files.filter(f => f.projectId === pid);
+  },
+  currentScheduleFile(projectId) {
+    return this.scheduleFiles({ projectId }).filter(f => f.status === 'active').sort((a, b) => b.revision - a.revision)[0] || null;
+  },
+  scheduleActivities(fileId) {
+    if (!fileId) { const f = this.currentScheduleFile(); fileId = f ? f.id : null; }
+    if (!fileId) return [];
+    return this.db.schedule.activities.filter(a => a.fileId === fileId);
+  },
+  addScheduleFile(meta, activities) {
+    const pid = this.db.currentProjectId;
+    const prev = this.scheduleFiles({ projectId: pid });
+    const revision = prev.length ? Math.max(...prev.map(f => f.revision || 0)) + 1 : 0;
+    prev.filter(f => f.status === 'active').forEach(f => f.status = 'superseded');
+    const file = Object.assign({
+      id: uid('schf'), projectId: pid, revision, status: 'active',
+      uploadedAt: new Date().toISOString(), uploadedBy: this.db.currentUserId,
+    }, meta);
+    this.db.schedule.files.push(file);
+    activities.forEach(a => this.db.schedule.activities.push(Object.assign({ id: uid('act'), projectId: pid, fileId: file.id, linkedConstraints: [], photos: [] }, a)));
+    this.scheduleAudit(file.id, 'uploaded', `${TX('رفع ملف برنامج زمني', 'Schedule file uploaded')} (Rev.${revision})`);
+    this.save();
+    return file;
+  },
+  setCurrentScheduleFile(fileId) {
+    const f = this.db.schedule.files.find(x => x.id === fileId); if (!f) return;
+    this.db.schedule.files.filter(x => x.projectId === f.projectId && x.status === 'active').forEach(x => { if (x.id !== f.id) x.status = 'superseded'; });
+    f.status = 'active';
+    this.scheduleAudit(f.id, 'restored', TX('تم اعتماد هذا الإصدار كنسخة حالية', 'Set as current version'));
+    this.save();
+  },
+  archiveScheduleFile(fileId) {
+    const f = this.db.schedule.files.find(x => x.id === fileId); if (!f) return;
+    f.status = 'archived';
+    this.scheduleAudit(f.id, 'archived', TX('أُرشف الملف', 'File archived'));
+    this.save();
+  },
+  restoreScheduleFile(fileId) {
+    const f = this.db.schedule.files.find(x => x.id === fileId); if (!f) return;
+    f.status = 'superseded';
+    this.scheduleAudit(f.id, 'restored', TX('استعادة الملف من الأرشيف', 'File restored from archive'));
+    this.save();
+  },
+  deleteScheduleFile(fileId) {
+    const f = this.db.schedule.files.find(x => x.id === fileId); if (!f) return;
+    this.db.schedule.activities = this.db.schedule.activities.filter(a => a.fileId !== fileId);
+    this.db.schedule.files = this.db.schedule.files.filter(x => x.id !== fileId);
+    this.scheduleAudit(fileId, 'deleted', TX('حذف الملف نهائياً', 'File permanently deleted'));
+    this.save();
+  },
+  scheduleAudit(fileId, action, notes = '') {
+    this.db.schedule.audit.push({
+      id: uid('saud'), projectId: this.db.currentProjectId, fileId, action, notes,
+      by: this.db.currentUserId, at: new Date().toISOString(),
+    });
+  },
+  scheduleAuditLog(projectId) {
+    const pid = projectId || this.db.currentProjectId;
+    return this.db.schedule.audit.filter(a => a.projectId === pid).sort((a, b) => b.at.localeCompare(a.at));
+  },
+  scheduleSnapshot(label) {
+    const pid = this.db.currentProjectId;
+    const acts = this.scheduleActivities();
+    this.db.schedule.snapshots.push({
+      id: uid('snap'), projectId: pid, label, at: new Date().toISOString(),
+      data: acts.map(a => ({ activityId: a.activityId, name: a.name, start: a.start, finish: a.finish, pctComplete: a.pctComplete, critical: a.critical, float: a.float })),
+    });
+    this.save();
+  },
+  scheduleSnapshots(projectId) {
+    const pid = projectId || this.db.currentProjectId;
+    return this.db.schedule.snapshots.filter(s => s.projectId === pid).sort((a, b) => b.at.localeCompare(a.at));
+  },
+  ensureWeeklySnapshot() {
+    const pid = this.db.currentProjectId; if (!pid || !this.currentScheduleFile(pid)) return;
+    const week = (() => { const d = new Date(); const onejan = new Date(d.getFullYear(), 0, 1); const wk = Math.ceil((((d - onejan) / 86400000) + onejan.getDay() + 1) / 7); return `${d.getFullYear()}-W${wk}`; })();
+    const exists = this.scheduleSnapshots(pid).some(s => s.label === week);
+    if (!exists) this.scheduleSnapshot(week);
   },
 
   // delete a master-data item

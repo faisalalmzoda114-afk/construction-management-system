@@ -15,6 +15,7 @@ const App = {
     risks: c => ModRisks.render(c),
     issues: c => ModIssues.render(c),
     tracker: c => ModTracker.render(c),
+    schedule: c => ModSchedule.render(c),
     observations: c => ModObservations.render(c),
     contractors: (c, p) => ModContractors.render(c, p),
     correspondence: c => ModCorrespondence.render(c),
@@ -341,6 +342,11 @@ const App = {
       }
       if (key === 'tracker') {
         const n = Store.list('constraint').filter(c => !Store.isClosed('constraint', c) && ModTracker.daysOverdue(c) > 0).length;
+        return n ? `<span class="badge">${n}</span>` : '';
+      }
+      if (key === 'schedule') {
+        const file = Store.currentScheduleFile();
+        const n = file ? Store.scheduleActivities(file.id).filter(a => ModSchedule.isDelayed(a)).length : 0;
         return n ? `<span class="badge">${n}</span>` : '';
       }
       return '';
